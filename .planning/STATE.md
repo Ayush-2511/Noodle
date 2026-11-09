@@ -3,10 +3,10 @@ gsd_state_version: '1.0'
 status: ready_to_execute
 progress:
   total_phases: 11
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 17
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 6
 ---
 
 # Project State: Noodle (Node-Based Deep Learning Builder)
@@ -15,16 +15,16 @@ progress:
 
 See: `.planning/PROJECT.md` (created 2026-11-09)  
 **Core value:** Drag nodes, connect wires, see tensor shapes update live, train on MNIST in the browser, export clean PyTorch code.  
-**Current focus:** Phase 0 (M0: Project Setup)
+**Current focus:** Phase 1 (M1: Graph Store & Core Nodes)
 
 ## Current Position
 
-Phase: 0 of 10 (M0: Project Setup)  
-Plan: 1 of 1 in current phase (`00-01-PLAN.md`)  
+Phase: 1 of 10 (M1: Graph Store & Core Nodes)  
+Plan: 1 of 2 in current phase (`01-01-PLAN.md`)  
 Status: Ready to execute  
-Last activity: 2026-11-09 — Project initialized from `docs/mvp-guide.md` with complete 11-milestone roadmap.
+Last activity: 2026-11-09 — Milestone 0 completed. Vite + React + TS + React Flow + Vitest bootstrapped, blank canvas loaded, smoke tests passing.
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█░░░░░░░░░] 6%
 
 ## Accumulated Context
 
@@ -46,3 +46,4 @@ None. All architectural rules, node parameters, and testing criteria are formall
 Last session: 2026-11-09  
 Stopped at: Project setup and planning complete. M0 and M1 plans drafted and ready for review.  
 Resume file: None
+

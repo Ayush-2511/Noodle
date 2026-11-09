@@ -78,3 +78,4 @@ Drag nodes, connect wires, see tensor shapes update live, train on MNIST in the 
 
 ---
 *Created: 2026-11-09 from `docs/mvp-guide.md`*
+

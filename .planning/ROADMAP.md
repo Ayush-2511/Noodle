@@ -6,7 +6,7 @@ A phased journey building a browser-based, visual node editor for designing, val
 
 ## Milestones (Phases)
 
-- [ ] **Phase 0 (M0): Project Setup** — Vite + React + TypeScript + React Flow + Vitest foundations.
+- [x] **Phase 0 (M0): Project Setup** — Vite + React + TypeScript + React Flow + Vitest foundations.
 - [ ] **Phase 1 (M1): Graph Store & Core Nodes** — Canonical Graph JSON schema, Zustand store, and 3 starter nodes (Input, Linear, Activation).
 - [ ] **Phase 2 (M2): Shape Engine & Validator** — Pure TS shape inference, topological sort, validation rules, color-coded wires, and shape badges.
 - [ ] **Phase 3 (M3): Core CNN Layers** — Flatten, Conv2D, MaxPool2D, Dropout, BatchNorm; verifies worked example T2 shape math.
@@ -34,7 +34,7 @@ A phased journey building a browser-based, visual node editor for designing, val
 **Plans**: 1 plan (`00-01-PLAN.md`)
 
 Plans:
-- [ ] 00-01: Initialize Vite + React + TS project, install React Flow and Vitest, configure paths, and establish smoke test.
+- [x] 00-01: Initialize Vite + React + TS project, install React Flow and Vitest, configure paths, and establish smoke test.
 
 ---
 
@@ -175,8 +175,8 @@ Plans:
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |---|---|---|---|---|
-| Phase 0 | M0: Project Setup | 0/1 | Ready to execute | - |
-| Phase 1 | M1: Graph Store & Core Nodes | 0/2 | Planned | - |
+| Phase 0 | M0: Project Setup | 1/1 | Completed | 2026-11-09 |
+| Phase 1 | M1: Graph Store & Core Nodes | 0/2 | Ready to execute | - |
 | Phase 2 | M2: Shape Engine & Validator | 0/2 | Pending | - |
 | Phase 3 | M3: Core CNN Layers | 0/2 | Pending | - |
 | Phase 4 | M4: Dataset & Training Runtime | 0/2 | Pending | - |
@@ -189,3 +189,4 @@ Plans:
 
 ---
 *Roadmap generated: 2026-11-09*
+
