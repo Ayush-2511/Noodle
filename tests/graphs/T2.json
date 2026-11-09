@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "nodes": [
+    { "id": "n1", "type": "Dataset", "params": { "name": "mnist" } },
+    { "id": "n2", "type": "Conv2D", "params": { "out_channels": 8, "kernel": 3, "padding": 1, "stride": 1 } },
+    { "id": "n3", "type": "Activation", "params": { "fn": "relu" } },
+    { "id": "n4", "type": "MaxPool2D", "params": { "kernel": 2, "stride": 2 } },
+    { "id": "n5", "type": "Conv2D", "params": { "out_channels": 16, "kernel": 3, "padding": 1, "stride": 1 } },
+    { "id": "n6", "type": "Activation", "params": { "fn": "relu" } },
+    { "id": "n7", "type": "MaxPool2D", "params": { "kernel": 2, "stride": 2 } },
+    { "id": "n8", "type": "Flatten", "params": {} },
+    { "id": "n9", "type": "Linear", "params": { "out_features": 10 } },
+    { "id": "n10", "type": "Loss", "params": { "fn": "cross_entropy" } }
+  ],
+  "edges": [
+    { "from": "n1.images", "to": "n2.in" },
+    { "from": "n2.out", "to": "n3.in" },
+    { "from": "n3.out", "to": "n4.in" },
+    { "from": "n4.out", "to": "n5.in" },
+    { "from": "n5.out", "to": "n6.in" },
+    { "from": "n6.out", "to": "n7.in" },
+    { "from": "n7.out", "to": "n8.in" },
+    { "from": "n8.out", "to": "n9.in" },
+    { "from": "n9.out", "to": "n10.logits" },
+    { "from": "n1.labels", "to": "n10.target" }
+  ]
+}
+

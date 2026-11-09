@@ -47,3 +47,53 @@ html, body, #root {
   display: none;
 }
 
+/* =========================================================
+   React Flow Socket Handles (No scale, lighter on hover)
+   ========================================================= */
+
+.react-flow__handle {
+  width: 14px !important;
+  height: 14px !important;
+  border-radius: 50% !important;
+  cursor: crosshair !important;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease !important;
+  z-index: 15 !important;
+}
+
+/* Large invisible hit area so user does not need pixel precision */
+.react-flow__handle::after {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  right: -8px;
+  bottom: -8px;
+  border-radius: 50%;
+  pointer-events: all;
+}
+
+/* Target Handle (Input / Left) */
+.react-flow__handle-left {
+  background-color: #38bdf8 !important; /* Sky 400 */
+  border: 2px solid #0f172a !important;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.35) !important;
+}
+
+.react-flow__handle-left:hover {
+  background-color: #bae6fd !important; /* Sky 200: Lighter on hover, no scaling */
+  border-color: #0284c7 !important;
+  box-shadow: 0 0 8px #38bdf8, 0 0 0 2px #7dd3fc !important;
+}
+
+/* Source Handle (Output / Right) */
+.react-flow__handle-right {
+  background-color: #22c55e !important; /* Emerald 500 */
+  border: 2px solid #0f172a !important;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.35) !important;
+}
+
+.react-flow__handle-right:hover {
+  background-color: #bbf7d0 !important; /* Emerald 200: Lighter on hover, no scaling */
+  border-color: #16a34a !important;
+  box-shadow: 0 0 8px #22c55e, 0 0 0 2px #86efac !important;
+}

@@ -568,7 +568,6 @@ export function inferNodeOutputShape(
 
     case 'Loss': {
       const logits = inputShapes['logits'] || inputShapes['in'];
-      const target = inputShapes['target'];
 
       if (!logits || logits === 'unknown') {
         return {

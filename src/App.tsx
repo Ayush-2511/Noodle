@@ -1,20 +1,43 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { Editor } from './ui/Editor';
 import { NodePalette } from './ui/NodePalette';
 import { JsonInspector } from './ui/JsonInspector';
+import { DebugPanel } from './ui/DebugPanel';
 import { useGraphStore } from './core/store';
-import { RotateCcw, Sparkles } from 'lucide-react';
+import { RotateCcw, Sparkles, Bug } from 'lucide-react';
 
 export const App: React.FC = () => {
+  const [isDebugOpen, setIsDebugOpen] = useState(false);
   const resetGraph = useGraphStore((state) => state.resetGraph);
   const loadGraph = useGraphStore((state) => state.loadGraph);
+
+  // Keyboard shortcut: 'D' to toggle Debug panel (Section 9.4)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in an input or select
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        e.target instanceof HTMLSelectElement
+      ) {
+        return;
+      }
+
+      if (e.key === 'd' || e.key === 'D') {
+        setIsDebugOpen((prev) => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handleLoadSample = () => {
     loadGraph({
       version: 1,
       nodes: [
-        { id: 'n1', type: 'Input', params: { shape: '[B, 1, 28, 28]' }, position: { x: 80, y: 140 } },
+        { id: 'n1', type: 'Input', params: { shape: '[B, 784]' }, position: { x: 80, y: 140 } },
         { id: 'n2', type: 'Linear', params: { out_features: 128 }, position: { x: 380, y: 140 } },
         { id: 'n3', type: 'Activation', params: { fn: 'relu' }, position: { x: 680, y: 140 } },
       ],
@@ -50,7 +73,27 @@ export const App: React.FC = () => {
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            onClick={() => setIsDebugOpen((prev) => !prev)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              padding: '4px 10px',
+              backgroundColor: isDebugOpen ? '#334155' : '#1e293b',
+              border: isDebugOpen ? '1px solid #38bdf8' : '1px solid #334155',
+              borderRadius: '6px',
+              color: isDebugOpen ? '#38bdf8' : '#cbd5e1',
+              fontSize: '0.75rem',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Bug size={13} />
+            <span>Debug Panel (D)</span>
+          </button>
+
           <button
             onClick={handleLoadSample}
             style={{
@@ -70,7 +113,7 @@ export const App: React.FC = () => {
             onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#334155')}
           >
             <Sparkles size={13} color="#38bdf8" />
-            <span>Load Sample (Input → Linear → ReLU)</span>
+            <span>Load Sample</span>
           </button>
 
           <button
@@ -102,11 +145,11 @@ export const App: React.FC = () => {
               padding: '2px 8px',
               borderRadius: '9999px',
               backgroundColor: '#1e293b',
-              color: '#38bdf8',
-              border: '1px solid #0284c7',
+              color: '#22c55e',
+              border: '1px solid #16a34a',
             }}
           >
-            M1: Graph Store & Live JSON
+            M2: Shape Engine & Wire Badges
           </span>
         </div>
       </header>
@@ -118,6 +161,7 @@ export const App: React.FC = () => {
           <ReactFlowProvider>
             <Editor />
           </ReactFlowProvider>
+          <DebugPanel isOpen={isDebugOpen} onClose={() => setIsDebugOpen(false)} />
         </main>
         <JsonInspector />
       </div>

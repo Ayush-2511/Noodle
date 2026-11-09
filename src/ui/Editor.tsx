@@ -11,49 +11,78 @@ import {
   EdgeChange,
 } from '@xyflow/react';
 import { CustomNode } from './CustomNode';
+import { CustomEdge } from './CustomEdge';
 import { useGraphStore } from '../core/store';
 import { parseSocketRef } from '../core/graph';
+import { validate } from '../core/validator';
 
 const nodeTypes = {
   customNode: CustomNode,
 };
 
+const edgeTypes = {
+  customEdge: CustomEdge,
+};
+
 export const Editor: React.FC = () => {
   const graph = useGraphStore((state) => state.graph);
+  const selectedNodeId = useGraphStore((state) => state.selectedNodeId);
+  const setSelectedNodeId = useGraphStore((state) => state.setSelectedNodeId);
   const addEdgeToStore = useGraphStore((state) => state.addEdge);
   const removeEdgeFromStore = useGraphStore((state) => state.removeEdge);
   const updateNodePosition = useGraphStore((state) => state.updateNodePosition);
   const removeNodeFromStore = useGraphStore((state) => state.removeNode);
 
-  // Convert canonical Graph nodes to React Flow nodes
-  const rfNodes: Node[] = useMemo(() => {
-    return graph.nodes.map((n) => ({
-      id: n.id,
-      type: 'customNode',
-      position: n.position || { x: 100, y: 100 },
-      data: {
-        type: n.type,
-        params: n.params,
-      },
-    }));
-  }, [graph.nodes]);
+  // Run pure validator on the canonical graph
+  const validationResult = useMemo(() => {
+    return validate(graph);
+  }, [graph]);
 
-  // Convert canonical Graph edges to React Flow edges
+  // Convert canonical Graph nodes to React Flow nodes with validation status
+  const rfNodes: Node[] = useMemo(() => {
+    return graph.nodes.map((n) => {
+      const nodeStatus = validationResult.nodeStatuses.get(n.id);
+      return {
+        id: n.id,
+        type: 'customNode',
+        position: n.position || { x: 100, y: 100 },
+        selected: n.id === selectedNodeId,
+        data: {
+          type: n.type,
+          params: n.params,
+          status: nodeStatus?.status || 'ok',
+          outputShapes: nodeStatus?.outputShapes || {},
+          paramCount: nodeStatus?.paramCount || 0,
+          problemMessage: nodeStatus?.problemMessage,
+        },
+      };
+    });
+  }, [graph.nodes, selectedNodeId, validationResult]);
+
+  // Convert canonical Graph edges to React Flow edges with shape & color data
   const rfEdges: Edge[] = useMemo(() => {
     return graph.edges.map((e) => {
       const fromRef = parseSocketRef(e.from);
       const toRef = parseSocketRef(e.to);
+      const wireKey = `${e.from}->${e.to}`;
+      const wireValidation = validationResult.wireStatuses.get(wireKey);
+
       return {
         id: `e-${e.from}->${e.to}`,
+        type: 'customEdge',
         source: fromRef.nodeId,
         sourceHandle: fromRef.socketId,
         target: toRef.nodeId,
         targetHandle: toRef.socketId,
-        animated: true,
-        style: { stroke: '#38bdf8', strokeWidth: 2 },
+        data: {
+          status: wireValidation?.status || 'valid',
+          shape: wireValidation?.shape || '[B]',
+          message: wireValidation?.message,
+          fixHint: wireValidation?.fixHint,
+        },
       };
     });
-  }, [graph.edges]);
+  }, [graph.edges, validationResult]);
 
   // Handle new wire connection
   const handleConnect = useCallback(
@@ -70,7 +99,7 @@ export const Editor: React.FC = () => {
     [addEdgeToStore]
   );
 
-  // Handle node drag and positioning
+  // Handle node drag, position update, and selection
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
       for (const change of changes) {
@@ -78,10 +107,16 @@ export const Editor: React.FC = () => {
           updateNodePosition(change.id, change.position);
         } else if (change.type === 'remove' && change.id) {
           removeNodeFromStore(change.id);
+        } else if (change.type === 'select') {
+          if (change.selected) {
+            setSelectedNodeId(change.id);
+          } else if (selectedNodeId === change.id) {
+            setSelectedNodeId(null);
+          }
         }
       }
     },
-    [updateNodePosition, removeNodeFromStore]
+    [updateNodePosition, removeNodeFromStore, setSelectedNodeId, selectedNodeId]
   );
 
   // Handle edge deletions
@@ -107,9 +142,12 @@ export const Editor: React.FC = () => {
         nodes={rfNodes}
         edges={rfEdges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onConnect={handleConnect}
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
+        onNodeClick={(_, node) => setSelectedNodeId(node.id)}
+        onPaneClick={() => setSelectedNodeId(null)}
         fitView
         minZoom={0.2}
         maxZoom={2.5}
