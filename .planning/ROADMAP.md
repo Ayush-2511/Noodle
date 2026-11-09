@@ -8,8 +8,8 @@ A phased journey building a browser-based, visual node editor for designing, val
 
 - [x] **Phase 0 (M0): Project Setup** — Vite + React + TypeScript + React Flow + Vitest foundations.
 - [x] **Phase 1 (M1): Graph Store & Core Nodes** — Canonical Graph JSON schema, Zustand store, and 3 starter nodes (Input, Linear, Activation).
-- [ ] **Phase 2 (M2): Shape Engine & Validator** — Pure TS shape inference, topological sort, validation rules, color-coded wires, and shape badges.
-- [ ] **Phase 3 (M3): Core CNN Layers** — Flatten, Conv2D, MaxPool2D, Dropout, BatchNorm; verifies worked example T2 shape math.
+- [x] **Phase 2 (M2): Shape Engine & Validator** — Pure TS shape inference, topological sort, validation rules, color-coded wires, and shape badges.
+- [x] **Phase 3 (M3): Core CNN Layers** — Flatten, Conv2D, MaxPool2D, Dropout, BatchNorm; verifies worked example T2 shape math.
 - [ ] **Phase 4 (M4): Dataset & Web Worker MLP Training** — Dataset node (MNIST), TF.js Web Worker runtime, training T1 to >90% accuracy.
 - [ ] **Phase 5 (M5): Training Graph Nodes & Telemetry** — Loss, Optimizer, Train, Metrics nodes wired into canvas with live loss/accuracy charts.
 - [ ] **Phase 6 (M6): CNN Training & Layout Bridge** — Channels-first to channels-last layout bridge, training T2 CNN to >95% accuracy.
@@ -177,9 +177,9 @@ Plans:
 |---|---|---|---|---|
 | Phase 0 | M0: Project Setup | 1/1 | Completed | 2026-11-09 |
 | Phase 1 | M1: Graph Store & Core Nodes | 2/2 | Completed | 2026-11-09 |
-| Phase 2 | M2: Shape Engine & Validator | 0/2 | Ready to execute | - |
-| Phase 3 | M3: Core CNN Layers | 0/2 | Pending | - |
-| Phase 4 | M4: Dataset & Training Runtime | 0/2 | Pending | - |
+| Phase 2 | M2: Shape Engine & Validator | 2/2 | Completed | 2026-11-09 |
+| Phase 3 | M3: Core CNN Layers | 2/2 | Completed | 2026-11-09 |
+| Phase 4 | M4: Dataset & Training Runtime | 0/2 | Ready to execute | - |
 | Phase 5 | M5: Training Nodes & Telemetry | 0/2 | Pending | - |
 | Phase 6 | M6: CNN Training & Layout Bridge | 0/2 | Pending | - |
 | Phase 7 | M7: Add & Concat Merge Nodes | 0/1 | Pending | - |

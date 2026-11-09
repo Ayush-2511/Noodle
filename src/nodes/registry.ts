@@ -9,11 +9,14 @@ import { dropoutNodeDef } from './dropout';
 import { batchnormNodeDef } from './batchnorm';
 import { activationNodeDef } from './activation';
 import { lossNodeDef } from './loss';
+import { optimizerNodeDef } from './optimizer';
+import { trainNodeDef } from './train';
+import { metricsNodeDef } from './metrics';
 
 /**
  * Node Registry
  * 
- * Maps node type identifiers (e.g. "Conv2D") to their NodeDefinition.
+ * Maps node type identifiers (e.g. "Train", "Metrics") to their NodeDefinition.
  */
 export const nodeRegistry: Record<string, NodeDefinition> = {
   // Data
@@ -33,6 +36,9 @@ export const nodeRegistry: Record<string, NodeDefinition> = {
 
   // Training
   Loss: lossNodeDef,
+  Optimizer: optimizerNodeDef,
+  Train: trainNodeDef,
+  Metrics: metricsNodeDef,
 };
 
 export function getNodeDefinition(type: string): NodeDefinition {

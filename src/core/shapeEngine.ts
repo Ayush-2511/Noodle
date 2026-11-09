@@ -598,8 +598,22 @@ export function inferNodeOutputShape(
       };
     }
 
-    case 'Optimizer':
-    case 'Train':
+    case 'Optimizer': {
+      return {
+        success: true,
+        outputShapes: { opt: 'scalar' },
+        paramCount: 0,
+      };
+    }
+
+    case 'Train': {
+      return {
+        success: true,
+        outputShapes: { metrics: 'scalar' },
+        paramCount: 0,
+      };
+    }
+
     case 'Metrics':
     case 'Predict': {
       return {

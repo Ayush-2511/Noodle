@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "nodes": [
+    { "id": "n1", "type": "Dataset", "params": { "name": "mnist" } },
+    { "id": "n2", "type": "Flatten", "params": {} },
+    { "id": "n3", "type": "Linear",  "params": { "out_features": 128 } },
+    { "id": "n4", "type": "Activation", "params": { "fn": "relu" } },
+    { "id": "n5", "type": "Linear",  "params": { "out_features": 10 } },
+    { "id": "n6", "type": "Loss",    "params": { "fn": "cross_entropy" } }
+  ],
+  "edges": [
+    { "from": "n1.images", "to": "n2.in" },
+    { "from": "n2.out",    "to": "n3.in" },
+    { "from": "n3.out",    "to": "n4.in" },
+    { "from": "n4.out",    "to": "n5.in" },
+    { "from": "n5.out",    "to": "n6.logits" },
+    { "from": "n1.labels", "to": "n6.target" }
+  ]
+}
+

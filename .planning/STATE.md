@@ -3,10 +3,10 @@ gsd_state_version: '1.0'
 status: ready_to_execute
 progress:
   total_phases: 11
-  completed_phases: 2
+  completed_phases: 4
   total_plans: 17
-  completed_plans: 3
-  percent: 18
+  completed_plans: 5
+  percent: 36
 ---
 
 # Project State: Noodle (Node-Based Deep Learning Builder)
@@ -15,16 +15,16 @@ progress:
 
 See: `.planning/PROJECT.md` (created 2026-11-09)  
 **Core value:** Drag nodes, connect wires, see tensor shapes update live, train on MNIST in the browser, export clean PyTorch code.  
-**Current focus:** Phase 2 (M2: Shape Engine & Validator)
+**Current focus:** Phase 4 (M4: Dataset & Web Worker MLP Training)
 
 ## Current Position
 
-Phase: 2 of 10 (M2: Shape Engine & Validator)  
-Plan: 1 of 2 in Phase 2  
-Status: Ready to plan / execute  
-Last activity: 2026-11-09 — Milestone 1 completed. Canonical Graph JSON data model, Zustand store, modular node definitions (Input, Linear, Activation), React Flow custom node handles, and real-time JSON inspector implemented. 13 unit tests passing green.
+Phase: 4 of 10 (M4: Dataset & Web Worker MLP Training)  
+Plan: 1 of 2 in Phase 4  
+Status: Ready to execute  
+Last activity: 2026-11-09 — Milestone 3 (Core CNN Layers) completed. Flatten, Conv2D, MaxPool2D, Dropout, BatchNorm, Dataset, and Loss added to node registry. T2 golden CNN worked example matches Section 7 shape table line-for-line. 22 unit tests passing green.
 
-Progress: [██░░░░░░░░] 18%
+Progress: [████░░░░░░] 36%
 
 ## Accumulated Context
 

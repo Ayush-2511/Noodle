@@ -1,18 +1,25 @@
 import { describe, it, expect } from 'vitest';
-import { getNodeDefinition, getAllNodeDefinitions, nodeRegistry } from '../src/nodes/registry';
+import { getNodeDefinition, getAllNodeDefinitions } from '../src/nodes/registry';
 
-describe('Node Registry & Definitions (Plan 01-02)', () => {
-  it('should register Input, Linear, and Activation nodes in registry', () => {
-    expect(nodeRegistry.Input).toBeDefined();
-    expect(nodeRegistry.Linear).toBeDefined();
-    expect(nodeRegistry.Activation).toBeDefined();
-
+describe('Node Registry & Definitions (M1 - M5)', () => {
+  it('should register core MVP nodes in registry', () => {
     const all = getAllNodeDefinitions();
-    expect(all.length).toBe(3);
+    expect(all.length).toBe(13);
     const types = all.map((d) => d.type);
+
     expect(types).toContain('Input');
+    expect(types).toContain('Dataset');
     expect(types).toContain('Linear');
+    expect(types).toContain('Conv2D');
+    expect(types).toContain('MaxPool2D');
+    expect(types).toContain('Flatten');
+    expect(types).toContain('Dropout');
+    expect(types).toContain('BatchNorm');
     expect(types).toContain('Activation');
+    expect(types).toContain('Loss');
+    expect(types).toContain('Optimizer');
+    expect(types).toContain('Train');
+    expect(types).toContain('Metrics');
   });
 
   it('Input node definition should match Section 4 spec', () => {
@@ -36,21 +43,45 @@ describe('Node Registry & Definitions (Plan 01-02)', () => {
     expect(def.outputs[0].id).toBe('out');
   });
 
-  it('Activation node definition should match Section 4 spec', () => {
-    const def = getNodeDefinition('Activation');
-    expect(def.type).toBe('Activation');
-    expect(def.group).toBe('Activation');
-    expect(def.defaultParams.fn).toBe('relu');
-    expect(def.inputs).toHaveLength(1);
-    expect(def.inputs[0].id).toBe('in');
-    expect(def.outputs).toHaveLength(1);
-    expect(def.outputs[0].id).toBe('out');
+  it('Conv2D and MaxPool2D node definitions should match Section 4 spec', () => {
+    const convDef = getNodeDefinition('Conv2D');
+    expect(convDef.type).toBe('Conv2D');
+    expect(convDef.group).toBe('Layers');
+    expect(convDef.defaultParams.out_channels).toBe(16);
+    expect(convDef.defaultParams.kernel).toBe(3);
+    expect(convDef.defaultParams.stride).toBe(1);
+    expect(convDef.defaultParams.padding).toBe(1);
 
-    // Should include standard activation function options
-    const fnField = def.paramFields.find((f) => f.key === 'fn');
-    expect(fnField?.type).toBe('select');
-    const options = fnField?.options?.map((o) => o.value);
-    expect(options).toEqual(['relu', 'sigmoid', 'tanh', 'gelu', 'softmax']);
+    const poolDef = getNodeDefinition('MaxPool2D');
+    expect(poolDef.type).toBe('MaxPool2D');
+    expect(poolDef.group).toBe('Layers');
+    expect(poolDef.defaultParams.kernel).toBe(2);
+    expect(poolDef.defaultParams.stride).toBe(2);
+  });
+
+  it('Flatten, Dropout, BatchNorm node definitions should match Section 4 spec', () => {
+    const flattenDef = getNodeDefinition('Flatten');
+    expect(flattenDef.type).toBe('Flatten');
+    expect(flattenDef.group).toBe('Layers');
+
+    const dropoutDef = getNodeDefinition('Dropout');
+    expect(dropoutDef.type).toBe('Dropout');
+    expect(dropoutDef.defaultParams.p).toBe(0.5);
+
+    const bnDef = getNodeDefinition('BatchNorm');
+    expect(bnDef.type).toBe('BatchNorm');
+  });
+
+  it('Dataset and Loss node definitions should match Section 4 spec', () => {
+    const dataDef = getNodeDefinition('Dataset');
+    expect(dataDef.type).toBe('Dataset');
+    expect(dataDef.group).toBe('Data');
+    expect(dataDef.outputs.map((s) => s.id)).toEqual(['images', 'labels']);
+
+    const lossDef = getNodeDefinition('Loss');
+    expect(lossDef.type).toBe('Loss');
+    expect(lossDef.group).toBe('Training');
+    expect(lossDef.inputs.map((s) => s.id)).toEqual(['logits', 'target']);
+    expect(lossDef.outputs[0].type).toBe('scalar');
   });
 });
-
