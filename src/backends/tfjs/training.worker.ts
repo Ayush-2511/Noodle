@@ -50,8 +50,9 @@ self.onmessage = async (e: MessageEvent<TrainingInMessage>) => {
 
     try {
       // 1. Compile model from canonical Graph JSON
-      const { model } = compileGraphToTfjs(msg.graph);
-      activeModel = model;
+      const compiled = compileGraphToTfjs(msg.graph);
+      activeModel = compiled.model;
+      const model = compiled.model;
 
       const initialTensors = tf.memory().numTensors;
       self.postMessage({
@@ -87,8 +88,30 @@ self.onmessage = async (e: MessageEvent<TrainingInMessage>) => {
         testImages,
       };
 
-      const epochs = msg.config?.epochs || 3;
-      const batchSize = msg.config?.batchSize || 32;
+      const epochs = msg.config?.epochs ?? compiled.epochs;
+      const batchSize = msg.config?.batchSize ?? compiled.batchSize;
+
+      // Send initial untrained baseline (Epoch 0: random initialization ~ln(10)=2.3, acc ~10%)
+      try {
+        const preEval = model.evaluate(data.testImages, data.testLabels) as tf.Scalar[];
+        const preLoss = (await preEval[0].data())[0];
+        const preAcc = (await preEval[1].data())[0];
+        preEval[0].dispose();
+        preEval[1].dispose();
+
+        self.postMessage({
+          type: 'EPOCH_END',
+          epoch: 0,
+          totalEpochs: epochs,
+          loss: preLoss,
+          accuracy: preAcc,
+          valLoss: preLoss,
+          valAccuracy: preAcc,
+          numTensors: tf.memory().numTensors,
+        });
+      } catch {
+        // Fallback if pre-eval fails
+      }
 
       // 3. Train model with progress callbacks
       await model.fit(data.trainImages, data.trainLabels, {

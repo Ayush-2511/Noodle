@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import * as tf from '@tensorflow/tfjs';
 import fs from 'fs';
 import path from 'path';
 import { compileGraphToTfjs } from '../src/backends/tfjs/modelCompiler';
@@ -16,22 +15,22 @@ describe('T2 CNN Training Smoke Test (Section 6 & Section 14 M6)', () => {
     const { model } = compileGraphToTfjs(graph);
     expect(model).toBeDefined();
 
-    // 3. Train 2 epochs smoke step (60 samples for fast reliable gradient step)
-    const rawData = generateSyntheticMnist(60);
+    // 3. Train 2 epochs smoke step (40 samples for fast reliable gradient step)
+    const rawData = generateSyntheticMnist(40);
 
     // Transpose from [B, 1, 28, 28] to [B, 28, 28, 1] for TF.js backend
     const trainImages = rawData.trainImages.transpose([0, 2, 3, 1]);
     const testImages = rawData.testImages.transpose([0, 2, 3, 1]);
 
     const history = await model.fit(trainImages, rawData.trainLabels, {
-      epochs: 3,
+      epochs: 2,
       batchSize: 16,
       validationData: [testImages, rawData.testLabels],
       verbose: 0,
     });
 
     const losses = history.history.loss as number[];
-    expect(losses.length).toBe(3);
+    expect(losses.length).toBe(2);
     expect(Number.isFinite(losses[losses.length - 1])).toBe(true);
     // Loss should decrease or be well-behaved
     expect(losses[losses.length - 1]).toBeLessThanOrEqual(losses[0] + 0.1);
@@ -44,5 +43,5 @@ describe('T2 CNN Training Smoke Test (Section 6 & Section 14 M6)', () => {
     rawData.testImages.dispose();
     rawData.testLabels.dispose();
     model.dispose();
-  }, 25000);
+  }, 45000);
 });

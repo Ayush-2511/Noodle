@@ -14,6 +14,10 @@ export interface CompiledTfjsModel {
   model: tf.LayersModel;
   inputShape: number[]; // e.g. [1, 28, 28] or [784]
   outputShape: number[]; // e.g. [10]
+  optimizerAlgo: string;
+  learningRate: number;
+  epochs: number;
+  batchSize: number;
 }
 
 export function compileGraphToTfjs(graph: Graph): CompiledTfjsModel {
@@ -52,8 +56,16 @@ export function compileGraphToTfjs(graph: Graph): CompiledTfjsModel {
     const node = graph.nodes.find((n) => n.id === nodeId);
     if (!node) continue;
 
-    // Skip data source and loss nodes when assembling trainable layers
-    if (node.type === 'Dataset' || node.type === 'Input' || node.type === 'Loss') {
+    // Skip non-trainable graph utility & training nodes when assembling layers
+    if (
+      node.type === 'Dataset' ||
+      node.type === 'Input' ||
+      node.type === 'Loss' ||
+      node.type === 'Optimizer' ||
+      node.type === 'Train' ||
+      node.type === 'Metrics' ||
+      node.type === 'Predict'
+    ) {
       continue;
     }
 
@@ -90,18 +102,33 @@ export function compileGraphToTfjs(graph: Graph): CompiledTfjsModel {
         else if (fn === 'softmax') tfActivation = 'softmax';
         else if (fn === 'gelu') tfActivation = 'gelu';
 
-        model.add(tf.layers.activation({ activation: tfActivation }));
+        const config: any = { activation: tfActivation };
+        if (isFirstLayer) {
+          config.inputShape = inputShape;
+          isFirstLayer = false;
+        }
+        model.add(tf.layers.activation(config));
         break;
       }
 
       case 'Dropout': {
         const rate = Number(node.params.p) || 0.5;
-        model.add(tf.layers.dropout({ rate }));
+        const config: any = { rate };
+        if (isFirstLayer) {
+          config.inputShape = inputShape;
+          isFirstLayer = false;
+        }
+        model.add(tf.layers.dropout(config));
         break;
       }
 
       case 'BatchNorm': {
-        model.add(tf.layers.batchNormalization());
+        const config: any = {};
+        if (isFirstLayer) {
+          config.inputShape = inputShape;
+          isFirstLayer = false;
+        }
+        model.add(tf.layers.batchNormalization(config));
         break;
       }
 
@@ -140,10 +167,40 @@ export function compileGraphToTfjs(graph: Graph): CompiledTfjsModel {
     }
   }
 
-  // Compile with standard Adam optimizer and softmaxCrossEntropy for logits
+  // Extract optimizer configuration from Optimizer node (or fallback to defaults)
+  const optimizerNode = graph.nodes.find((n) => n.type === 'Optimizer');
+  const optAlgo = String(optimizerNode?.params?.algo || 'adam').toLowerCase();
+  const optLr = Number(optimizerNode?.params?.lr) || 0.005;
+
+  let optimizer: tf.Optimizer;
+  if (optAlgo === 'sgd') {
+    optimizer = tf.train.sgd(optLr);
+  } else if (optAlgo === 'rmsprop') {
+    optimizer = tf.train.rmsprop(optLr);
+  } else {
+    optimizer = tf.train.adam(optLr);
+  }
+
+  // Extract loss objective from Loss node (or fallback to cross_entropy)
+  const lossNode = graph.nodes.find((n) => n.type === 'Loss');
+  const lossFn = String(lossNode?.params?.fn || 'cross_entropy').toLowerCase();
+  let lossFunction: any;
+  if (lossFn === 'mse') {
+    lossFunction = (yTrue: tf.Tensor, yPred: tf.Tensor) => tf.losses.meanSquaredError(yTrue, yPred);
+  } else {
+    // CrossEntropy takes raw logits per Trap 2
+    lossFunction = (yTrue: tf.Tensor, yPred: tf.Tensor) => tf.losses.softmaxCrossEntropy(yTrue, yPred);
+  }
+
+  // Extract training loop parameters from Train node
+  const trainNode = graph.nodes.find((n) => n.type === 'Train');
+  const epochs = Number(trainNode?.params?.epochs) || 3;
+  const batchSize = Number(trainNode?.params?.batch_size) || 32;
+
+  // Compile with configured optimizer and loss
   model.compile({
-    optimizer: tf.train.adam(0.005),
-    loss: (yTrue, yPred) => tf.losses.softmaxCrossEntropy(yTrue, yPred),
+    optimizer,
+    loss: lossFunction,
     metrics: ['accuracy'],
   });
 
@@ -151,5 +208,9 @@ export function compileGraphToTfjs(graph: Graph): CompiledTfjsModel {
     model,
     inputShape,
     outputShape: [10],
+    optimizerAlgo: optAlgo,
+    learningRate: optLr,
+    epochs,
+    batchSize,
   };
 }

@@ -334,7 +334,14 @@ function getExpectedInputSockets(type: string): string[] {
       return ['logits', 'target', 'in'];
     case 'Input':
     case 'Dataset':
+    case 'Optimizer':
       return [];
+    case 'Train':
+      return ['loss', 'opt'];
+    case 'Metrics':
+      return ['metrics', 'in'];
+    case 'Predict':
+      return ['in'];
     default:
       return ['in'];
   }

@@ -1,9 +1,11 @@
 import React, { useCallback } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Play, Square } from 'lucide-react';
 import { getNodeDefinition } from '../nodes/registry';
 import { useGraphStore } from '../core/store';
 import { formatShape, TensorShape } from '../core/shapeEngine';
+import { useTrainingSafe } from '../backends/tfjs/TrainingContext';
+import { MetricsChart } from './MetricsChart';
 
 export interface CustomNodeData {
   type: string;
@@ -18,8 +20,10 @@ export interface CustomNodeData {
 export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
   const nodeData = data as unknown as CustomNodeData;
   const def = getNodeDefinition(nodeData.type);
+  const graph = useGraphStore((state) => state.graph);
   const updateNodeParams = useGraphStore((state) => state.updateNodeParams);
   const removeNode = useGraphStore((state) => state.removeNode);
+  const training = useTrainingSafe();
 
   const handleParamChange = useCallback(
     (key: string, value: any) => {
@@ -321,6 +325,96 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
           <span>out: <strong style={{ color: formattedOutShape === 'unknown' ? '#64748b' : '#38bdf8' }}>{formattedOutShape}</strong></span>
           <span>params: <strong style={{ color: '#cbd5e1' }}>{paramCount.toLocaleString()}</strong></span>
         </div>
+
+        {/* Train Node Interactive Controls (Milestone 5) */}
+        {nodeData.type === 'Train' && training && (
+          <div
+            style={{
+              marginTop: 8,
+              paddingTop: 8,
+              borderTop: '1px solid #334155',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
+            }}
+          >
+            {training.status === 'training' ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  training.stopTraining();
+                }}
+                style={{
+                  width: '100%',
+                  padding: '6px',
+                  backgroundColor: '#ef4444',
+                  border: 'none',
+                  borderRadius: 4,
+                  color: '#ffffff',
+                  fontWeight: 600,
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                }}
+              >
+                <Square size={12} fill="#ffffff" />
+                <span>Stop Training</span>
+              </button>
+            ) : (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  training.startTraining(graph, {
+                    epochs: Number(nodeData.params.epochs) || 3,
+                    batchSize: Number(nodeData.params.batch_size) || 32,
+                  });
+                }}
+                style={{
+                  width: '100%',
+                  padding: '6px',
+                  backgroundColor: '#22c55e',
+                  border: 'none',
+                  borderRadius: 4,
+                  color: '#052e16',
+                  fontWeight: 600,
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                }}
+              >
+                <Play size={12} fill="#052e16" />
+                <span>Run Training Loop</span>
+              </button>
+            )}
+
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: '0.68rem',
+                color: '#94a3b8',
+                fontFamily: 'monospace',
+              }}
+            >
+              <span>Status: <strong style={{ color: training.status === 'training' ? '#38bdf8' : training.status === 'completed' ? '#22c55e' : training.status === 'error' ? '#ef4444' : '#cbd5e1' }}>{training.status.toUpperCase()}</strong></span>
+              {training.status === 'training' && <span>Ep {training.currentEpoch}/{training.totalEpochs}</span>}
+            </div>
+          </div>
+        )}
+
+        {/* Metrics Telemetry Chart (Milestone 5) */}
+        {nodeData.type === 'Metrics' && (
+          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #334155' }}>
+            <MetricsChart history={training?.history || []} />
+          </div>
+        )}
 
         {/* Problem Error / Warning Message */}
         {nodeData.problemMessage && (

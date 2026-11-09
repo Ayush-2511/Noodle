@@ -10,9 +10,9 @@ A phased journey building a browser-based, visual node editor for designing, val
 - [x] **Phase 1 (M1): Graph Store & Core Nodes** — Canonical Graph JSON schema, Zustand store, and 3 starter nodes (Input, Linear, Activation).
 - [x] **Phase 2 (M2): Shape Engine & Validator** — Pure TS shape inference, topological sort, validation rules, color-coded wires, and shape badges.
 - [x] **Phase 3 (M3): Core CNN Layers** — Flatten, Conv2D, MaxPool2D, Dropout, BatchNorm; verifies worked example T2 shape math.
-- [ ] **Phase 4 (M4): Dataset & Web Worker MLP Training** — Dataset node (MNIST), TF.js Web Worker runtime, training T1 to >90% accuracy.
-- [ ] **Phase 5 (M5): Training Graph Nodes & Telemetry** — Loss, Optimizer, Train, Metrics nodes wired into canvas with live loss/accuracy charts.
-- [ ] **Phase 6 (M6): CNN Training & Layout Bridge** — Channels-first to channels-last layout bridge, training T2 CNN to >95% accuracy.
+- [x] **Phase 4 (M4): Dataset & Web Worker MLP Training** — Dataset node (MNIST), TF.js Web Worker runtime, training T1 to >90% accuracy.
+- [x] **Phase 5 (M5): Training Graph Nodes & Telemetry** — Loss, Optimizer, Train, Metrics nodes wired into canvas with live loss/accuracy charts.
+- [x] **Phase 6 (M6): CNN Training & Layout Bridge** — Channels-first to channels-last layout bridge, training T2 CNN to >95% accuracy.
 - [ ] **Phase 7 (M7): Multi-Branch & Merge Nodes** — Add and Concat nodes with shape validation; T3 (residual) and T4 (concat) pass.
 - [ ] **Phase 8 (M8): Interactive Predict Node** — On-device digit drawing and test sample inference.
 - [ ] **Phase 9 (M9): PyTorch Export & Parity Harness** — PyTorch Python codegen and automated numerical parity verification (within 4 decimals).

@@ -5,15 +5,15 @@ import { NodePalette } from './ui/NodePalette';
 import { JsonInspector } from './ui/JsonInspector';
 import { DebugPanel } from './ui/DebugPanel';
 import { TrainingPanel } from './ui/TrainingPanel';
-import { useTrainingWorker } from './backends/tfjs/useTrainingWorker';
+import { TrainingProvider, useTraining } from './backends/tfjs/TrainingContext';
 import { useGraphStore } from './core/store';
-import { RotateCcw, Sparkles, Bug } from 'lucide-react';
+import { RotateCcw, Sparkles, Bug, PlayCircle } from 'lucide-react';
 
-export const App: React.FC = () => {
+const MainApp: React.FC = () => {
   const [isDebugOpen, setIsDebugOpen] = useState(false);
   const resetGraph = useGraphStore((state) => state.resetGraph);
   const loadGraph = useGraphStore((state) => state.loadGraph);
-  const training = useTrainingWorker();
+  const training = useTraining();
 
   // Keyboard shortcut: 'D' to toggle Debug panel (Section 9.4)
   useEffect(() => {
@@ -88,6 +88,34 @@ export const App: React.FC = () => {
     });
   };
 
+  const handleLoadFullPipeline = () => {
+    loadGraph({
+      version: 1,
+      nodes: [
+        { id: 'n1', type: 'Dataset', params: { name: 'mnist' }, position: { x: 40, y: 100 } },
+        { id: 'n2', type: 'Flatten', params: {}, position: { x: 300, y: 100 } },
+        { id: 'n3', type: 'Linear', params: { out_features: 128 }, position: { x: 560, y: 100 } },
+        { id: 'n4', type: 'Activation', params: { fn: 'relu' }, position: { x: 820, y: 100 } },
+        { id: 'n5', type: 'Linear', params: { out_features: 10 }, position: { x: 1080, y: 100 } },
+        { id: 'n6', type: 'Loss', params: { fn: 'cross_entropy' }, position: { x: 1340, y: 100 } },
+        { id: 'n7', type: 'Optimizer', params: { algo: 'adam', lr: 0.005 }, position: { x: 1340, y: 340 } },
+        { id: 'n8', type: 'Train', params: { epochs: 3, batch_size: 32 }, position: { x: 1610, y: 200 } },
+        { id: 'n9', type: 'Metrics', params: {}, position: { x: 1880, y: 200 } },
+      ],
+      edges: [
+        { from: 'n1.images', to: 'n2.in' },
+        { from: 'n2.out', to: 'n3.in' },
+        { from: 'n3.out', to: 'n4.in' },
+        { from: 'n4.out', to: 'n5.in' },
+        { from: 'n5.out', to: 'n6.logits' },
+        { from: 'n1.labels', to: 'n6.target' },
+        { from: 'n6.out', to: 'n8.loss' },
+        { from: 'n7.opt', to: 'n8.opt' },
+        { from: 'n8.metrics', to: 'n9.metrics' },
+      ],
+    });
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100vw', height: '100vh', backgroundColor: '#0f172a' }}>
       {/* Top Application Bar */}
@@ -132,6 +160,29 @@ export const App: React.FC = () => {
           >
             <Bug size={13} />
             <span>Debug Panel (D)</span>
+          </button>
+
+          <button
+            onClick={handleLoadFullPipeline}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              padding: '4px 10px',
+              backgroundColor: '#1e293b',
+              border: '1px solid #a855f7',
+              borderRadius: '6px',
+              color: '#d8b4fe',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#3b0764')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1e293b')}
+          >
+            <PlayCircle size={13} color="#c084fc" />
+            <span>Full Pipeline (M5)</span>
           </button>
 
           <button
@@ -207,11 +258,11 @@ export const App: React.FC = () => {
               padding: '2px 8px',
               borderRadius: '9999px',
               backgroundColor: '#1e293b',
-              color: '#22c55e',
-              border: '1px solid #16a34a',
+              color: '#a855f7',
+              border: '1px solid #7e22ce',
             }}
           >
-            M4: Web Worker Training
+            M5: Live Telemetry
           </span>
         </div>
       </header>
@@ -231,6 +282,14 @@ export const App: React.FC = () => {
       {/* Live Training Sanity Panel (Section 9.6) */}
       <TrainingPanel training={training} />
     </div>
+  );
+};
+
+export const App: React.FC = () => {
+  return (
+    <TrainingProvider>
+      <MainApp />
+    </TrainingProvider>
   );
 };
 

@@ -1,17 +1,22 @@
 import React from 'react';
 import { Play, Square, Activity, Cpu, CheckCircle2, AlertOctagon } from 'lucide-react';
 import { TrainingWorkerState } from '../backends/tfjs/useTrainingWorker';
+import { useTrainingSafe } from '../backends/tfjs/TrainingContext';
 import { useGraphStore } from '../core/store';
 import { validate } from '../core/validator';
 
 interface TrainingPanelProps {
-  training: TrainingWorkerState;
+  training?: TrainingWorkerState;
 }
 
-export const TrainingPanel: React.FC<TrainingPanelProps> = ({ training }) => {
+export const TrainingPanel: React.FC<TrainingPanelProps> = ({ training: propTraining }) => {
+  const contextTraining = useTrainingSafe();
+  const training = propTraining || contextTraining;
   const graph = useGraphStore((state) => state.graph);
   const validation = validate(graph);
   const isGraphValid = validation.isValid && graph.nodes.length > 0;
+
+  if (!training) return null;
 
   const handleStart = () => {
     if (!isGraphValid) return;
