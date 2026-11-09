@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "nodes": [
+    { "id": "n1", "type": "Dataset", "params": { "name": "mnist" } },
+    { "id": "n2", "type": "Linear", "params": { "out_features": 128 } }
+  ],
+  "edges": [
+    { "from": "n1.images", "to": "n2.in" }
+  ]
+}
+

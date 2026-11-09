@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "nodes": [
+    { "id": "n1", "type": "Input", "params": { "shape": "[B, 10]" } },
+    { "id": "n2", "type": "Activation", "params": { "fn": "softmax" } },
+    { "id": "n3", "type": "Loss", "params": { "fn": "cross_entropy" } }
+  ],
+  "edges": [
+    { "from": "n1.out", "to": "n2.in" },
+    { "from": "n2.out", "to": "n3.logits" }
+  ]
+}
+

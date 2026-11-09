@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "nodes": [
+    { "id": "n1", "type": "Linear", "params": { "out_features": 128 } },
+    { "id": "n2", "type": "Activation", "params": { "fn": "relu" } },
+    { "id": "n3", "type": "Linear", "params": { "out_features": 128 } }
+  ],
+  "edges": [
+    { "from": "n1.out", "to": "n2.in" },
+    { "from": "n2.out", "to": "n3.in" },
+    { "from": "n3.out", "to": "n1.in" }
+  ]
+}
+

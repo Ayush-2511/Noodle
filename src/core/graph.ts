@@ -1,0 +1,88 @@
+/**
+ * Noodle - Canonical Graph Data Model
+ * 
+ * GOLDEN RULE (mvp-guide.md § 2 & § 5):
+ * The Graph JSON is the ONLY interface between editor and engine. No hidden state.
+ * Core types are completely decoupled from UI (React Flow) and ML runtimes (TF.js, PyTorch).
+ */
+
+export type NodeParamValue = string | number | boolean | number[] | null | undefined;
+
+export type NodeParams = Record<string, NodeParamValue>;
+
+export interface SocketDefinition {
+  id: string;      // e.g. "in", "out", "images", "labels", "logits", "target"
+  name: string;    // Human-readable label
+  type: 'tensor' | 'scalar' | 'optimizer' | 'dataset';
+}
+
+export interface GraphNode {
+  id: string;                      // Immutable ID (e.g. "n1", "n2") - Trap 11
+  type: string;                    // e.g. "Input", "Linear", "Activation", ...
+  params: NodeParams;              // Type-specific configuration parameters
+  position?: { x: number; y: number }; // Optional canvas position for editor persistence
+}
+
+export interface GraphEdge {
+  from: string; // format: "nodeId.socketId", e.g. "n1.out"
+  to: string;   // format: "nodeId.socketId", e.g. "n2.in"
+}
+
+export interface Graph {
+  version: 1;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
+/**
+ * Socket reference helper functions
+ */
+export interface SocketRef {
+  nodeId: string;
+  socketId: string;
+}
+
+/**
+ * Parses a reference string in the form "nodeId.socketId"
+ */
+export function parseSocketRef(ref: string): SocketRef {
+  const dotIndex = ref.indexOf('.');
+  if (dotIndex === -1) {
+    throw new Error(`Invalid socket reference "${ref}". Expected format: "nodeId.socketId"`);
+  }
+  return {
+    nodeId: ref.slice(0, dotIndex),
+    socketId: ref.slice(dotIndex + 1),
+  };
+}
+
+/**
+ * Creates a socket reference string in the format "nodeId.socketId"
+ */
+export function makeSocketRef(nodeId: string, socketId: string): string {
+  return `${nodeId}.${socketId}`;
+}
+
+/**
+ * Validates canonical Graph JSON structure
+ */
+export function isGraphValidJson(data: unknown): data is Graph {
+  if (typeof data !== 'object' || data === null) return false;
+  const candidate = data as Partial<Graph>;
+  if (candidate.version !== 1) return false;
+  if (!Array.isArray(candidate.nodes) || !Array.isArray(candidate.edges)) return false;
+
+  for (const node of candidate.nodes) {
+    if (!node || typeof node.id !== 'string' || typeof node.type !== 'string' || typeof node.params !== 'object') {
+      return false;
+    }
+  }
+
+  for (const edge of candidate.edges) {
+    if (!edge || typeof edge.from !== 'string' || typeof edge.to !== 'string') {
+      return false;
+    }
+  }
+
+  return true;
+}

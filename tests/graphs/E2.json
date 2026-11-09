@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "nodes": [
+    { "id": "n1", "type": "Input", "params": { "shape": "[B, 16, 7, 7]" } },
+    { "id": "n2", "type": "Input", "params": { "shape": "[B, 8, 7, 7]" } },
+    { "id": "n3", "type": "Add", "params": {} }
+  ],
+  "edges": [
+    { "from": "n1.out", "to": "n3.a" },
+    { "from": "n2.out", "to": "n3.b" }
+  ]
+}
+
