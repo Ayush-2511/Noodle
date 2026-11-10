@@ -6,7 +6,7 @@ import { JsonInspector } from './ui/JsonInspector';
 import { DebugPanel } from './ui/DebugPanel';
 import { TrainingPanel } from './ui/TrainingPanel';
 import { GlossaryPanel } from './ui/GlossaryPanel';
-import { TemplateGalleryModal, TemplateItem } from './ui/TemplateGalleryModal';
+import { TemplateGalleryModal, TemplateItem, TEMPLATES } from './ui/TemplateGalleryModal';
 import { OnboardingTour } from './ui/OnboardingTour';
 import { TrainingProvider, useTraining } from './backends/tfjs/TrainingContext';
 import { useGraphStore } from './core/store';
@@ -28,7 +28,14 @@ const MainApp: React.FC = () => {
     if (!hasSeenTour) {
       setIsTourOpen(true);
     }
-  }, []);
+
+    // Default to the v2 CNN Pipeline template if graph is empty
+    const currentNodes = useGraphStore.getState().graph.nodes;
+    if (currentNodes.length === 0) {
+      const defaultTemplate = TEMPLATES.find((t) => t.id === 'v2-cnn') || TEMPLATES[0];
+      loadGraph(defaultTemplate.graph);
+    }
+  }, [loadGraph]);
 
   // Global Keyboard shortcuts: 'D' for debug, 'G' for glossary, 'T' for templates, '?' for guide
   useEffect(() => {

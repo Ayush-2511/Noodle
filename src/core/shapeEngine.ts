@@ -8,6 +8,8 @@
  * - If one node fails, downstream nodes receive 'unknown' instead of cascading dozens of errors.
  */
 
+import { LayerEntry } from './graph';
+
 export type Dimension = 'B' | number;
 export type TensorShape = Dimension[] | 'scalar' | 'unknown';
 
@@ -86,13 +88,207 @@ export function getTensorRank(shape: TensorShape): number {
   return -1;
 }
 
+export interface LayerShapeResult {
+  layerId: string;
+  type: string;
+  outputShape: TensorShape;
+  paramCount: number;
+  error?: string;
+  fixHint?: string;
+}
+
+export interface BuilderShapeResult {
+  layerShapes: LayerShapeResult[];
+  totalParams: number;
+  finalOutputShape: TensorShape;
+  errors: Array<{ layerId: string; message: string; fixHint?: string }>;
+}
+
+/**
+ * Sequential shape inference over internal builder layer stacks (FeatureExtractor, Classifier)
+ */
+export function inferBuilderShapes(
+  layers: LayerEntry[],
+  inputShape: TensorShape
+): BuilderShapeResult {
+  const layerShapes: LayerShapeResult[] = [];
+  const errors: Array<{ layerId: string; message: string; fixHint?: string }> = [];
+  let totalParams = 0;
+  let currentShape: TensorShape = inputShape;
+
+  for (const layer of layers) {
+    if (currentShape === 'unknown') {
+      layerShapes.push({
+        layerId: layer.id,
+        type: layer.type,
+        outputShape: 'unknown',
+        paramCount: 0,
+      });
+      continue;
+    }
+
+    switch (layer.type) {
+      case 'Conv2D': {
+        if (!Array.isArray(currentShape) || (currentShape.length !== 3 && currentShape.length !== 4)) {
+          const err = `Conv2D requires 3-D [C, H, W] or 4-D [B, C, H, W] input, got ${formatShape(currentShape)}`;
+          const hint = 'Feature Extractor layers require spatial image shapes';
+          errors.push({ layerId: layer.id, message: err, fixHint: hint });
+          layerShapes.push({ layerId: layer.id, type: layer.type, outputShape: 'unknown', paramCount: 0, error: err, fixHint: hint });
+          currentShape = 'unknown';
+          break;
+        }
+
+        const isRank4 = currentShape.length === 4;
+        const inC = Number(isRank4 ? currentShape[1] : currentShape[0]);
+        const inH = Number(isRank4 ? currentShape[2] : currentShape[1]);
+        const inW = Number(isRank4 ? currentShape[3] : currentShape[2]);
+
+        const filters = Number(layer.params.filters || layer.params.out_channels) || 8;
+        const kernel = Number(layer.params.kernel || layer.params.kernel_size) || 3;
+        const stride = Number(layer.params.stride) || 1;
+        const padding = layer.params.padding !== undefined ? Number(layer.params.padding) : (layer.params.pad !== undefined ? Number(layer.params.pad) : 0);
+
+        const outH = Math.floor((inH - kernel + 2 * padding) / stride) + 1;
+        const outW = Math.floor((inW - kernel + 2 * padding) / stride) + 1;
+
+        if (outH <= 0 || outW <= 0) {
+          const err = `Conv2D output collapsed to ${outH}×${outW}.`;
+          const hint = 'Decrease kernel size or increase padding';
+          errors.push({ layerId: layer.id, message: err, fixHint: hint });
+          layerShapes.push({ layerId: layer.id, type: layer.type, outputShape: 'unknown', paramCount: 0, error: err, fixHint: hint });
+          currentShape = 'unknown';
+          break;
+        }
+
+        const params = (kernel * kernel * inC + 1) * filters;
+        totalParams += params;
+        const outShape: TensorShape = isRank4 ? ['B', filters, outH, outW] : [filters, outH, outW];
+        currentShape = outShape;
+        layerShapes.push({ layerId: layer.id, type: layer.type, outputShape: outShape, paramCount: params });
+        break;
+      }
+
+      case 'MaxPool2D': {
+        if (!Array.isArray(currentShape) || (currentShape.length !== 3 && currentShape.length !== 4)) {
+          const err = `MaxPool2D requires 3-D or 4-D spatial input, got ${formatShape(currentShape)}`;
+          errors.push({ layerId: layer.id, message: err });
+          layerShapes.push({ layerId: layer.id, type: layer.type, outputShape: 'unknown', paramCount: 0, error: err });
+          currentShape = 'unknown';
+          break;
+        }
+
+        const isRank4 = currentShape.length === 4;
+        const inC = currentShape[isRank4 ? 1 : 0];
+        const inH = Number(currentShape[isRank4 ? 2 : 1]);
+        const inW = Number(currentShape[isRank4 ? 3 : 2]);
+
+        const kernel = Number(layer.params.kernel || layer.params.kernel_size) || 2;
+        const stride = Number(layer.params.stride) || kernel;
+
+        const outH = Math.floor((inH - kernel) / stride) + 1;
+        const outW = Math.floor((inW - kernel) / stride) + 1;
+
+        if (outH <= 0 || outW <= 0) {
+          const err = `MaxPool2D output collapsed to ${outH}×${outW}.`;
+          const hint = 'Decrease pool kernel size';
+          errors.push({ layerId: layer.id, message: err, fixHint: hint });
+          layerShapes.push({ layerId: layer.id, type: layer.type, outputShape: 'unknown', paramCount: 0, error: err, fixHint: hint });
+          currentShape = 'unknown';
+          break;
+        }
+
+        const outShape: TensorShape = isRank4 ? ['B', inC, outH, outW] : [inC, outH, outW];
+        currentShape = outShape;
+        layerShapes.push({ layerId: layer.id, type: layer.type, outputShape: outShape, paramCount: 0 });
+        break;
+      }
+
+      case 'Linear': {
+        if (!Array.isArray(currentShape) || currentShape.length > 2) {
+          const err = `Linear requires 1-D or 2-D flat input [B, F], got ${formatShape(currentShape)}`;
+          const hint = 'Insert a Flatten node before Classifier or Linear layer';
+          errors.push({ layerId: layer.id, message: err, fixHint: hint });
+          layerShapes.push({ layerId: layer.id, type: layer.type, outputShape: 'unknown', paramCount: 0, error: err, fixHint: hint });
+          currentShape = 'unknown';
+          break;
+        }
+
+        const isRank2 = currentShape.length === 2;
+        const inFeatures = Number(isRank2 ? currentShape[1] : currentShape[0]);
+        const neurons = Number(layer.params.neurons || layer.params.out_features || layer.params.units) || 10;
+
+        const params = (inFeatures + 1) * neurons;
+        totalParams += params;
+        const outShape: TensorShape = isRank2 ? ['B', neurons] : [neurons];
+        currentShape = outShape;
+        layerShapes.push({ layerId: layer.id, type: layer.type, outputShape: outShape, paramCount: params });
+        break;
+      }
+
+      case 'Flatten': {
+        if (!Array.isArray(currentShape)) {
+          layerShapes.push({ layerId: layer.id, type: layer.type, outputShape: currentShape, paramCount: 0 });
+          break;
+        }
+        if (currentShape.length <= 2) {
+          // Already flat
+          layerShapes.push({ layerId: layer.id, type: layer.type, outputShape: currentShape, paramCount: 0 });
+          break;
+        }
+        const isRank4 = currentShape.length === 4;
+        let product = 1;
+        const startIdx = isRank4 ? 1 : 0;
+        for (let i = startIdx; i < currentShape.length; i++) {
+          product *= Number(currentShape[i]);
+        }
+        const outShape: TensorShape = isRank4 ? ['B', product] : [product];
+        currentShape = outShape;
+        layerShapes.push({ layerId: layer.id, type: layer.type, outputShape: outShape, paramCount: 0 });
+        break;
+      }
+
+      case 'Dropout': {
+        layerShapes.push({ layerId: layer.id, type: layer.type, outputShape: currentShape, paramCount: 0 });
+        break;
+      }
+
+      case 'BatchNorm': {
+        let params = 0;
+        if (Array.isArray(currentShape)) {
+          const featDim = currentShape.length >= 3 ? (currentShape.length === 4 ? currentShape[1] : currentShape[0]) : (currentShape.length === 2 ? currentShape[1] : currentShape[0]);
+          params = 2 * Number(featDim || 0);
+        }
+        totalParams += params;
+        layerShapes.push({ layerId: layer.id, type: layer.type, outputShape: currentShape, paramCount: params });
+        break;
+      }
+
+      case 'ReLU':
+      case 'Sigmoid':
+      case 'Activation':
+      default: {
+        layerShapes.push({ layerId: layer.id, type: layer.type, outputShape: currentShape, paramCount: 0 });
+        break;
+      }
+    }
+  }
+
+  return {
+    layerShapes,
+    totalParams,
+    finalOutputShape: currentShape,
+    errors,
+  };
+}
+
 /**
  * Pure shape inference for a single node given its input socket shapes and parameters
  */
 export function inferNodeOutputShape(
   type: string,
   params: Record<string, any>,
-  inputShapes: Record<string, TensorShape> // socketId -> TensorShape
+  inputShapes: Record<string, TensorShape>, // socketId -> TensorShape
+  layers?: LayerEntry[]
 ): NodeShapeResult {
   switch (type) {
     case 'Input': {
@@ -208,7 +404,7 @@ export function inferNodeOutputShape(
     }
 
     case 'Flatten': {
-      const inShape = inputShapes['in'];
+      const inShape = inputShapes['in'] || inputShapes['data'];
       if (inShape === undefined) {
         return {
           success: false,
@@ -606,7 +802,169 @@ export function inferNodeOutputShape(
       };
     }
 
+    case 'LoadDataset': {
+      const name = String(params.dataset || params.name || 'mnist').toLowerCase();
+      if (name.includes('cifar')) {
+        return {
+          success: true,
+          outputShapes: {
+            data: ['B', 3, 32, 32],
+            images: ['B', 3, 32, 32],
+            labels: ['B'],
+          },
+          paramCount: 0,
+        };
+      }
+      return {
+        success: true,
+        outputShapes: {
+          data: ['B', 1, 28, 28],
+          images: ['B', 1, 28, 28],
+          labels: ['B'],
+        },
+        paramCount: 0,
+      };
+    }
+
+    case 'Shuffle': {
+      const inData = inputShapes['data'] || inputShapes['in'];
+      return {
+        success: true,
+        outputShapes: { data: inData || 'unknown' },
+        paramCount: 0,
+      };
+    }
+
+    case 'TrainTestSplit': {
+      const inData = inputShapes['data'] || inputShapes['in'];
+      return {
+        success: true,
+        outputShapes: {
+          train: inData || 'unknown',
+          test: inData || 'unknown',
+        },
+        paramCount: 0,
+      };
+    }
+
+    case 'Normalize': {
+      const inData = inputShapes['data'] || inputShapes['in'];
+      return {
+        success: true,
+        outputShapes: { data: inData || 'unknown' },
+        paramCount: 0,
+      };
+    }
+
+    case 'FeatureExtractor': {
+      const inShape = inputShapes['in'] || inputShapes['data'];
+      if (inShape === undefined) {
+        return {
+          success: false,
+          error: 'Feature Extractor has no input connected.',
+          fixHint: 'Connect an image data source (e.g. LoadDataset, Normalize)',
+          outputShapes: { out: 'unknown' },
+          paramCount: 0,
+        };
+      }
+      if (inShape === 'unknown') {
+        return {
+          success: true,
+          outputShapes: { out: 'unknown' },
+          paramCount: 0,
+        };
+      }
+
+      const rank = getTensorRank(inShape);
+      if (rank !== 3 && rank !== 4) {
+        return {
+          success: false,
+          error: `Feature Extractor requires spatial image input [B, C, H, W], got ${formatShape(inShape)}.`,
+          fixHint: 'Connect spatial image data before Flattening',
+          outputShapes: { out: 'unknown' },
+          paramCount: 0,
+        };
+      }
+
+      const builderResult = inferBuilderShapes(layers || [], inShape);
+      if (builderResult.errors.length > 0) {
+        return {
+          success: false,
+          error: builderResult.errors[0].message,
+          fixHint: builderResult.errors[0].fixHint,
+          outputShapes: { out: 'unknown' },
+          paramCount: builderResult.totalParams,
+        };
+      }
+
+      return {
+        success: true,
+        outputShapes: { out: builderResult.finalOutputShape },
+        paramCount: builderResult.totalParams,
+      };
+    }
+
+    case 'Classifier': {
+      const inShape = inputShapes['in'] || inputShapes['data'];
+      if (inShape === undefined) {
+        return {
+          success: false,
+          error: 'Classifier has no input connected.',
+          fixHint: 'Connect a Flatten node output or 1D vector features',
+          outputShapes: { model: 'scalar' },
+          paramCount: 0,
+        };
+      }
+      if (inShape === 'unknown') {
+        return {
+          success: true,
+          outputShapes: { model: 'scalar' },
+          paramCount: 0,
+        };
+      }
+
+      const rank = getTensorRank(inShape);
+      if (rank > 2) {
+        return {
+          success: false,
+          error: `Classifier requires 1D flat input [B, F], got ${formatShape(inShape)}.`,
+          fixHint: 'Connect a Flatten node between Feature Extractor and Classifier',
+          outputShapes: { model: 'scalar' },
+          paramCount: 0,
+        };
+      }
+
+      const builderResult = inferBuilderShapes(layers || [], inShape);
+      if (builderResult.errors.length > 0) {
+        return {
+          success: false,
+          error: builderResult.errors[0].message,
+          fixHint: builderResult.errors[0].fixHint,
+          outputShapes: { model: 'scalar' },
+          paramCount: builderResult.totalParams,
+        };
+      }
+
+      return {
+        success: true,
+        outputShapes: { model: 'scalar' },
+        paramCount: builderResult.totalParams,
+      };
+    }
+
     case 'Train': {
+      return {
+        success: true,
+        outputShapes: {
+          trained_model: 'scalar',
+          history: 'scalar',
+          metrics: 'scalar',
+        },
+        paramCount: 0,
+      };
+    }
+
+    case 'Evaluate': {
       return {
         success: true,
         outputShapes: { metrics: 'scalar' },

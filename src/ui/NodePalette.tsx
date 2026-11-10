@@ -6,12 +6,16 @@ import { NodeDefinition } from '../nodes/types';
 
 const GROUP_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
   Data: { bg: '#082f49', text: '#38bdf8', dot: '#38bdf8' },
+  Pipeline: { bg: '#164e63', text: '#22d3ee', dot: '#06b6d4' },
+  Model: { bg: '#3b0764', text: '#c084fc', dot: '#a855f7' },
   Layers: { bg: '#064e3b', text: '#34d399', dot: '#10b981' },
   Activation: { bg: '#1e1b4b', text: '#818cf8', dot: '#6366f1' },
   Combine: { bg: '#451a03', text: '#fbbf24', dot: '#f59e0b' },
-  Training: { bg: '#3b0764', text: '#d8b4fe', dot: '#c084fc' },
+  Training: { bg: '#4c0519', text: '#fda4af', dot: '#f43f5e' },
   Utility: { bg: '#1e293b', text: '#94a3b8', dot: '#64748b' },
 };
+
+const GROUP_ORDER = ['Data', 'Pipeline', 'Model', 'Training', 'Layers', 'Activation', 'Combine', 'Utility'];
 
 export const NodePalette: React.FC = () => {
   const [search, setSearch] = useState('');
@@ -128,7 +132,13 @@ export const NodePalette: React.FC = () => {
             No layers matching &quot;{search}&quot;
           </div>
         ) : (
-          Object.entries(groups).map(([groupName, defs]) => {
+          Object.entries(groups)
+            .sort(([a], [b]) => {
+              const idxA = GROUP_ORDER.indexOf(a);
+              const idxB = GROUP_ORDER.indexOf(b);
+              return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+            })
+            .map(([groupName, defs]) => {
             const colors = GROUP_COLORS[groupName] || GROUP_COLORS.Utility;
 
             return (

@@ -50,6 +50,7 @@ export const Editor: React.FC = () => {
         data: {
           type: n.type,
           params: n.params,
+          layers: n.layers,
           status: nodeStatus?.status || 'ok',
           outputShapes: nodeStatus?.outputShapes || {},
           paramCount: nodeStatus?.paramCount || 0,
@@ -78,6 +79,7 @@ export const Editor: React.FC = () => {
         data: {
           status: wireValidation?.status || 'valid',
           shape: wireValidation?.shape || '[B]',
+          dataType: wireValidation?.dataType,
           message: wireValidation?.message,
           fixHint: wireValidation?.fixHint,
         },

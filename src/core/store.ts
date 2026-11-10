@@ -4,6 +4,7 @@ import {
   GraphNode,
   GraphEdge,
   NodeParams,
+  LayerEntry,
   parseSocketRef,
 } from './graph';
 
@@ -12,7 +13,7 @@ export interface GraphState {
   selectedNodeId: string | null;
 
   // Actions
-  addNode: (type: string, params?: NodeParams, position?: { x: number; y: number }) => string;
+  addNode: (type: string, params?: NodeParams, position?: { x: number; y: number }, layers?: LayerEntry[]) => string;
   removeNode: (nodeId: string) => void;
   updateNodeParams: (nodeId: string, params: Partial<NodeParams>) => void;
   updateNodePosition: (nodeId: string, position: { x: number; y: number }) => void;
@@ -22,6 +23,12 @@ export interface GraphState {
   loadGraph: (newGraph: Graph) => void;
   resetGraph: () => void;
   getCanonicalJson: () => string;
+
+  // Layer CRUD for builder nodes (v2)
+  addLayer: (nodeId: string, layerType: string, params?: Record<string, any>) => void;
+  removeLayer: (nodeId: string, layerId: string) => void;
+  reorderLayer: (nodeId: string, layerId: string, newIndex: number) => void;
+  updateLayerParams: (nodeId: string, layerId: string, params: Record<string, any>) => void;
 }
 
 /**
@@ -49,6 +56,56 @@ export function resetNextIdCounter(start = 1): void {
   nextIdCounter = start;
 }
 
+function generateUniqueLayerId(existingLayers: LayerEntry[]): string {
+  let maxNum = 0;
+  for (const l of existingLayers) {
+    if (l.id.startsWith('l')) {
+      const num = parseInt(l.id.slice(1), 10);
+      if (!isNaN(num) && num > maxNum) {
+        maxNum = num;
+      }
+    }
+  }
+  return `l${maxNum + 1}`;
+}
+
+export function getDefaultParamsForLayer(layerType: string): Record<string, any> {
+  switch (layerType) {
+    case 'Conv2D':
+      return { filters: 8, kernel: 3, stride: 1, padding: 1 };
+    case 'MaxPool2D':
+      return { kernel: 2, stride: 2 };
+    case 'Linear':
+      return { neurons: 128 };
+    case 'Dropout':
+      return { rate: 0.5 };
+    case 'BatchNorm':
+    case 'ReLU':
+    case 'Sigmoid':
+    case 'Flatten':
+    default:
+      return {};
+  }
+}
+
+function getDefaultLayersForNode(type: string): LayerEntry[] | undefined {
+  if (type === 'FeatureExtractor') {
+    return [
+      { id: 'l1', type: 'Conv2D', params: { filters: 8, kernel: 3, stride: 1, padding: 1 } },
+      { id: 'l2', type: 'ReLU', params: {} },
+      { id: 'l3', type: 'MaxPool2D', params: { kernel: 2, stride: 2 } },
+    ];
+  }
+  if (type === 'Classifier') {
+    return [
+      { id: 'l1', type: 'Linear', params: { neurons: 128 } },
+      { id: 'l2', type: 'ReLU', params: {} },
+      { id: 'l3', type: 'Linear', params: { neurons: 10 } },
+    ];
+  }
+  return undefined;
+}
+
 export const useGraphStore = create<GraphState>((set, get) => ({
   graph: {
     version: 1,
@@ -57,15 +114,17 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   },
   selectedNodeId: null,
 
-  addNode: (type: string, params: NodeParams = {}, position = { x: 100, y: 100 }) => {
+  addNode: (type: string, params: NodeParams = {}, position = { x: 100, y: 100 }, layers?: LayerEntry[]) => {
     let newId = '';
     set((state) => {
       newId = generateUniqueNodeId(state.graph.nodes);
+      const initialLayers = layers ?? getDefaultLayersForNode(type);
       const newNode: GraphNode = {
         id: newId,
         type,
         params: { ...params },
         position,
+        ...(initialLayers ? { layers: initialLayers } : {}),
       };
 
       return {
@@ -181,8 +240,14 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
     set({
       graph: {
-        version: 1,
-        nodes: [...newGraph.nodes],
+        version: newGraph.version || 2,
+        nodes: newGraph.nodes.map((n) => ({
+          id: n.id,
+          type: n.type,
+          params: { ...n.params },
+          position: n.position ? { ...n.position } : undefined,
+          ...(n.layers ? { layers: n.layers.map((l) => ({ ...l, params: { ...l.params } })) } : {}),
+        })),
         edges: [...newGraph.edges],
       },
       selectedNodeId: null,
@@ -203,13 +268,28 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
   getCanonicalJson: () => {
     const { graph } = get();
+    // Detect whether graph uses v2 features (layers, builder nodes, pipeline nodes)
+    const isV2 =
+      graph.version === 2 ||
+      graph.nodes.some(
+        (n) =>
+          (n.layers && n.layers.length > 0) ||
+          n.type === 'FeatureExtractor' ||
+          n.type === 'Classifier' ||
+          n.type === 'LoadDataset' ||
+          n.type === 'Shuffle' ||
+          n.type === 'TrainTestSplit' ||
+          n.type === 'Normalize'
+      );
+
     // Produce clean, spec-compliant JSON without UI coordinate noise
     const canonical = {
-      version: 1,
+      version: isV2 ? 2 : 1,
       nodes: graph.nodes.map((n) => ({
         id: n.id,
         type: n.type,
         params: n.params,
+        ...(n.layers && n.layers.length > 0 ? { layers: n.layers } : {}),
       })),
       edges: graph.edges.map((e) => ({
         from: e.from,
@@ -217,5 +297,83 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       })),
     };
     return JSON.stringify(canonical, null, 2);
+  },
+
+  addLayer: (nodeId: string, layerType: string, params?: Record<string, any>) => {
+    set((state) => {
+      const node = state.graph.nodes.find((n) => n.id === nodeId);
+      if (!node) return state;
+
+      const currentLayers = node.layers || [];
+      const newLayerId = generateUniqueLayerId(currentLayers);
+      const defaultParams = getDefaultParamsForLayer(layerType);
+      const newLayer: LayerEntry = {
+        id: newLayerId,
+        type: layerType,
+        params: params ? { ...params } : defaultParams,
+      };
+
+      return {
+        graph: {
+          ...state.graph,
+          nodes: state.graph.nodes.map((n) =>
+            n.id === nodeId ? { ...n, layers: [...currentLayers, newLayer] } : n
+          ),
+        },
+      };
+    });
+  },
+
+  removeLayer: (nodeId: string, layerId: string) => {
+    set((state) => ({
+      graph: {
+        ...state.graph,
+        nodes: state.graph.nodes.map((n) =>
+          n.id === nodeId
+            ? { ...n, layers: (n.layers || []).filter((l) => l.id !== layerId) }
+            : n
+        ),
+      },
+    }));
+  },
+
+  reorderLayer: (nodeId: string, layerId: string, newIndex: number) => {
+    set((state) => {
+      const node = state.graph.nodes.find((n) => n.id === nodeId);
+      if (!node || !node.layers) return state;
+
+      const layers = [...node.layers];
+      const oldIndex = layers.findIndex((l) => l.id === layerId);
+      if (oldIndex === -1 || newIndex < 0 || newIndex >= layers.length) return state;
+
+      const [moved] = layers.splice(oldIndex, 1);
+      layers.splice(newIndex, 0, moved);
+
+      return {
+        graph: {
+          ...state.graph,
+          nodes: state.graph.nodes.map((n) =>
+            n.id === nodeId ? { ...n, layers } : n
+          ),
+        },
+      };
+    });
+  },
+
+  updateLayerParams: (nodeId: string, layerId: string, params: Record<string, any>) => {
+    set((state) => ({
+      graph: {
+        ...state.graph,
+        nodes: state.graph.nodes.map((n) => {
+          if (n.id !== nodeId || !n.layers) return n;
+          return {
+            ...n,
+            layers: n.layers.map((l) =>
+              l.id === layerId ? { ...l, params: { ...l.params, ...params } } : l
+            ),
+          };
+        }),
+      },
+    }));
   },
 }));

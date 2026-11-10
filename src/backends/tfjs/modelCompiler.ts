@@ -7,7 +7,7 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
-import { Graph } from '../../core/graph';
+import { Graph, LayerEntry } from '../../core/graph';
 import { topologicalSort } from '../../core/topoSort';
 
 export interface CompiledTfjsModel {
@@ -24,6 +24,12 @@ export function compileGraphToTfjs(graph: Graph): CompiledTfjsModel {
   const topo = topologicalSort(graph);
   if (topo.hasCycle) {
     throw new Error(`Cannot compile model: graph contains a cycle (${topo.cyclePath.join(' -> ')})`);
+  }
+
+  // Check if graph uses v2 builder nodes (Classifier, FeatureExtractor)
+  const isV2 = graph.nodes.some((n) => n.type === 'Classifier' || n.type === 'FeatureExtractor');
+  if (isV2) {
+    return compileV2Model(graph, topo.sortedNodeIds);
   }
 
   // Find data source node (Dataset or Input)
@@ -415,4 +421,170 @@ function compileFunctionalModel(
   }
 
   return tf.model({ inputs: inputTensor, outputs: outputTensor });
+}
+
+/**
+ * Compiles a v2 Pipeline model with builder nodes (FeatureExtractor, Classifier)
+ * using standard sequential composition.
+ */
+function compileV2Model(
+  graph: Graph,
+  sortedNodeIds: string[]
+): CompiledTfjsModel {
+  const classifierNode = graph.nodes.find((n) => n.type === 'Classifier');
+  const hasFlatten = graph.nodes.some((n) => n.type === 'Flatten');
+
+  // Determine source data shape
+  const datasetNode = graph.nodes.find((n) => n.type === 'LoadDataset' || n.type === 'Dataset' || n.type === 'Input');
+  let logicalInputShape = [1, 28, 28]; // [C, H, W]
+  if (datasetNode) {
+    const dsName = String(datasetNode.params.dataset || datasetNode.params.name || 'mnist').toLowerCase();
+    if (dsName.includes('cifar')) {
+      logicalInputShape = [3, 32, 32];
+    }
+  }
+
+  // TF.js expects channels-last [H, W, C] for 2D Conv
+  const tfSpatialShape = [logicalInputShape[1], logicalInputShape[2], logicalInputShape[0]]; // e.g. [28, 28, 1]
+
+  const allLayers: LayerEntry[] = [];
+
+  // 1. Feature Extractor layers (in topological order)
+  for (const nodeId of sortedNodeIds) {
+    const n = graph.nodes.find((node) => node.id === nodeId);
+    if (n && n.type === 'FeatureExtractor' && n.layers) {
+      allLayers.push(...n.layers);
+    }
+  }
+
+  // 2. Flatten if present or if bridging spatial FeatureExtractor to Linear Classifier
+  const hasSpatialLayers = allLayers.some((l) => l.type === 'Conv2D' || l.type === 'MaxPool2D');
+  if (hasFlatten || hasSpatialLayers) {
+    allLayers.push({ id: 'auto_flatten', type: 'Flatten', params: {} });
+  }
+
+  // 3. Classifier layers
+  if (classifierNode?.layers) {
+    allLayers.push(...classifierNode.layers);
+  }
+
+  // Fallback if no layers defined at all
+  if (allLayers.length === 0) {
+    allLayers.push({ id: 'default_dense', type: 'Linear', params: { neurons: 10 } });
+  }
+
+  const model = tf.sequential();
+  let isFirst = true;
+
+  // Compile each layer
+  for (const layer of allLayers) {
+    const config: any = {};
+    if (isFirst) {
+      if (layer.type === 'Conv2D' || (layer.type === 'Flatten' && !hasSpatialLayers)) {
+        config.inputShape = tfSpatialShape;
+      } else if (layer.type === 'Linear') {
+        config.inputShape = [logicalInputShape[0] * logicalInputShape[1] * logicalInputShape[2]]; // [784]
+      } else {
+        config.inputShape = tfSpatialShape;
+      }
+      isFirst = false;
+    }
+
+    switch (layer.type) {
+      case 'Conv2D': {
+        const filters = Number(layer.params.filters || layer.params.out_channels) || 8;
+        const kernel = Number(layer.params.kernel || layer.params.kernel_size) || 3;
+        const stride = Number(layer.params.stride) || 1;
+        const padding = layer.params.padding !== undefined ? Number(layer.params.padding) : (layer.params.pad !== undefined ? Number(layer.params.pad) : 0);
+        model.add(tf.layers.conv2d({
+          ...config,
+          filters,
+          kernelSize: kernel,
+          strides: stride,
+          padding: padding > 0 ? 'same' : 'valid',
+        }));
+        break;
+      }
+      case 'MaxPool2D': {
+        const kernel = Number(layer.params.kernel || layer.params.kernel_size) || 2;
+        const stride = Number(layer.params.stride) || kernel;
+        model.add(tf.layers.maxPooling2d({
+          ...config,
+          poolSize: kernel,
+          strides: stride,
+        }));
+        break;
+      }
+      case 'Flatten': {
+        model.add(tf.layers.flatten(config));
+        break;
+      }
+      case 'Linear': {
+        const neurons = Number(layer.params.neurons || layer.params.out_features || layer.params.units) || 10;
+        model.add(tf.layers.dense({
+          ...config,
+          units: neurons,
+          useBias: true,
+        }));
+        break;
+      }
+      case 'ReLU': {
+        model.add(tf.layers.activation({ ...config, activation: 'relu' }));
+        break;
+      }
+      case 'Sigmoid': {
+        model.add(tf.layers.activation({ ...config, activation: 'sigmoid' }));
+        break;
+      }
+      case 'Dropout': {
+        const rate = Number(layer.params.rate) || 0.5;
+        model.add(tf.layers.dropout({ ...config, rate }));
+        break;
+      }
+      case 'BatchNorm': {
+        model.add(tf.layers.batchNormalization(config));
+        break;
+      }
+    }
+  }
+
+  // Training parameters from Train node or defaults
+  const trainNode = graph.nodes.find((n) => n.type === 'Train');
+  const optAlgo = String(trainNode?.params?.optimizer || 'adam').toLowerCase();
+  const optLr = Number(trainNode?.params?.lr) || 0.001;
+  const epochs = Number(trainNode?.params?.epochs) || 10;
+  const batchSize = Number(trainNode?.params?.batch_size) || 32;
+
+  let optimizer: tf.Optimizer;
+  if (optAlgo === 'sgd') {
+    optimizer = tf.train.sgd(optLr);
+  } else if (optAlgo === 'rmsprop') {
+    optimizer = tf.train.rmsprop(optLr);
+  } else {
+    optimizer = tf.train.adam(optLr);
+  }
+
+  const lossParam = String(classifierNode?.params?.loss || 'cross_entropy').toLowerCase();
+  let lossFunction: any;
+  if (lossParam === 'mse') {
+    lossFunction = (yTrue: tf.Tensor, yPred: tf.Tensor) => tf.losses.meanSquaredError(yTrue, yPred);
+  } else {
+    lossFunction = (yTrue: tf.Tensor, yPred: tf.Tensor) => tf.losses.softmaxCrossEntropy(yTrue, yPred);
+  }
+
+  model.compile({
+    optimizer,
+    loss: lossFunction,
+    metrics: ['accuracy'],
+  });
+
+  return {
+    model,
+    inputShape: logicalInputShape,
+    outputShape: [10],
+    optimizerAlgo: optAlgo,
+    learningRate: optLr,
+    epochs,
+    batchSize,
+  };
 }

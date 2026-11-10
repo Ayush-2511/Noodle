@@ -1,11 +1,11 @@
 import { NodeDefinition } from './types';
 
 /**
- * Metrics Node
+ * Metrics Node (v1 & v2 Compatible)
  * 
  * Displays live loss and accuracy curves streamed in real time during training.
  * Socket:
- * - metrics: incoming telemetry stream from Train node
+ * - metrics / history: incoming telemetry stream from Train node
  */
 export const metricsNodeDef: NodeDefinition = {
   type: 'Metrics',
@@ -18,10 +18,9 @@ export const metricsNodeDef: NodeDefinition = {
     {
       id: 'metrics',
       label: 'metrics',
-      type: 'scalar',
+      type: 'metrics',
     },
   ],
   outputs: [],
   paramFields: [],
 };
-

@@ -15,36 +15,56 @@ import { optimizerNodeDef } from './optimizer';
 import { trainNodeDef } from './train';
 import { metricsNodeDef } from './metrics';
 
+// v2 Pipeline Nodes
+import { loadDatasetNodeDef } from './loadDataset';
+import { shuffleNodeDef } from './shuffle';
+import { trainTestSplitNodeDef } from './trainTestSplit';
+import { normalizeNodeDef } from './normalize';
+import { featureExtractorNodeDef } from './featureExtractor';
+import { classifierNodeDef } from './classifier';
+import { evaluateNodeDef } from './evaluate';
+import { predictNodeDef } from './predict';
+
 /**
  * Node Registry
  * 
- * Maps node type identifiers (e.g. "Train", "Metrics") to their NodeDefinition.
+ * Maps node type identifiers (e.g. "Train", "Metrics", "Classifier") to their NodeDefinition.
  */
 export const nodeRegistry: Record<string, NodeDefinition> = {
-  // Data
-  Input: inputNodeDef,
+  // Data (v1 & v2)
+  LoadDataset: loadDatasetNodeDef,
   Dataset: datasetNodeDef,
+  Input: inputNodeDef,
 
-  // Layers
+  // Pipeline (v2)
+  Shuffle: shuffleNodeDef,
+  TrainTestSplit: trainTestSplitNodeDef,
+  Normalize: normalizeNodeDef,
+  Flatten: flattenNodeDef,
+
+  // Model Builders (v2)
+  FeatureExtractor: featureExtractorNodeDef,
+  Classifier: classifierNodeDef,
+
+  // Layers (v1 & internal builder components)
   Conv2D: conv2dNodeDef,
   MaxPool2D: maxpool2dNodeDef,
-  Flatten: flattenNodeDef,
   Linear: linearNodeDef,
   Dropout: dropoutNodeDef,
   BatchNorm: batchnormNodeDef,
-
-  // Activation
   Activation: activationNodeDef,
 
   // Combine (Multi-branch / Merge)
   Add: addNodeDef,
   Concat: concatNodeDef,
 
-  // Training
+  // Training & Evaluation (v1 & v2)
+  Train: trainNodeDef,
+  Evaluate: evaluateNodeDef,
+  Predict: predictNodeDef,
+  Metrics: metricsNodeDef,
   Loss: lossNodeDef,
   Optimizer: optimizerNodeDef,
-  Train: trainNodeDef,
-  Metrics: metricsNodeDef,
 };
 
 export function getNodeDefinition(type: string): NodeDefinition {

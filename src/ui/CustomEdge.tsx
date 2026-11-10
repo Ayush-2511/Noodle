@@ -8,8 +8,9 @@ import {
 import { WireStatus } from '../core/validator';
 
 export interface CustomEdgeData {
-  status: WireStatus; // 'valid' (green), 'error' (red), 'unknown' (grey)
+  status: WireStatus; // 'valid', 'error', 'unknown'
   shape: string; // e.g. "[B, 128]" or "unknown"
+  dataType?: 'dataset' | 'model' | 'metrics' | 'tensor' | 'scalar' | 'optimizer';
   message?: string;
   fixHint?: string;
 }
@@ -39,10 +40,13 @@ export const CustomEdge: React.FC<EdgeProps> = ({
     shape: 'unknown',
   };
 
-  // Color-coded wire styles (Section 9.1):
-  // 🟢 green = compatible shapes
-  // 🔴 red = shape error
-  // ⚪ grey = upstream error, shape unknown
+  // Wire styling by data type and validity status:
+  // - dataset: 🔵 Blue (#38bdf8)
+  // - model: 🟣 Purple (#a855f7)
+  // - metrics: 🟠 Orange (#f59e0b)
+  // - tensor / scalar: ⚪ White/Slate (#94a3b8) or Green (#22c55e)
+  // - error: 🔴 Red (#ef4444)
+  // - unknown: ⚪ Muted Grey (#64748b)
   let strokeColor = '#22c55e'; // green (default valid)
   let badgeBg = '#14532d';
   let badgeBorder = '#22c55e';
@@ -58,6 +62,21 @@ export const CustomEdge: React.FC<EdgeProps> = ({
     badgeBg = '#1e293b';
     badgeBorder = '#475569';
     badgeText = '#94a3b8';
+  } else if (edgeData.dataType === 'dataset') {
+    strokeColor = '#38bdf8'; // Blue
+    badgeBg = '#0c4a6e';
+    badgeBorder = '#38bdf8';
+    badgeText = '#7dd3fc';
+  } else if (edgeData.dataType === 'model') {
+    strokeColor = '#c084fc'; // Purple
+    badgeBg = '#581c87';
+    badgeBorder = '#c084fc';
+    badgeText = '#f3e8ff';
+  } else if (edgeData.dataType === 'metrics') {
+    strokeColor = '#f59e0b'; // Orange
+    badgeBg = '#78350f';
+    badgeBorder = '#f59e0b';
+    badgeText = '#fef3c7';
   }
 
   const isError = edgeData.status === 'error';

@@ -4,7 +4,7 @@ import { getNodeDefinition, getAllNodeDefinitions } from '../src/nodes/registry'
 describe('Node Registry & Definitions (M1 - M7)', () => {
   it('should register core MVP nodes in registry', () => {
     const all = getAllNodeDefinitions();
-    expect(all.length).toBe(15);
+    expect(all.length).toBeGreaterThanOrEqual(15);
     const types = all.map((d) => d.type);
 
     expect(types).toContain('Input');

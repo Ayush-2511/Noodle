@@ -10,17 +10,29 @@ export type NodeParamValue = string | number | boolean | number[] | null | undef
 
 export type NodeParams = Record<string, NodeParamValue>;
 
+export type SocketDataType = 'tensor' | 'scalar' | 'optimizer' | 'dataset' | 'model' | 'metrics';
+
 export interface SocketDefinition {
-  id: string;      // e.g. "in", "out", "images", "labels", "logits", "target"
+  id: string;      // e.g. "in", "out", "images", "labels", "logits", "target", "data", "model", "metrics"
   name: string;    // Human-readable label
-  type: 'tensor' | 'scalar' | 'optimizer' | 'dataset';
+  type: SocketDataType;
+}
+
+/**
+ * A single layer inside a builder node (FeatureExtractor or Classifier)
+ */
+export interface LayerEntry {
+  id: string;                      // e.g. "l1", "l2"
+  type: string;                    // "Conv2D", "Linear", "ReLU", "MaxPool2D", "Dropout", "BatchNorm", "Sigmoid"
+  params: Record<string, any>;     // Layer-specific parameters
 }
 
 export interface GraphNode {
   id: string;                      // Immutable ID (e.g. "n1", "n2") - Trap 11
-  type: string;                    // e.g. "Input", "Linear", "Activation", ...
+  type: string;                    // e.g. "LoadDataset", "FeatureExtractor", "Classifier", etc.
   params: NodeParams;              // Type-specific configuration parameters
   position?: { x: number; y: number }; // Optional canvas position for editor persistence
+  layers?: LayerEntry[];           // Optional internal layer stack for builder nodes
 }
 
 export interface GraphEdge {
@@ -29,7 +41,7 @@ export interface GraphEdge {
 }
 
 export interface Graph {
-  version: 1;
+  version: 1 | 2;
   nodes: GraphNode[];
   edges: GraphEdge[];
 }
@@ -69,7 +81,7 @@ export function makeSocketRef(nodeId: string, socketId: string): string {
 export function isGraphValidJson(data: unknown): data is Graph {
   if (typeof data !== 'object' || data === null) return false;
   const candidate = data as Partial<Graph>;
-  if (candidate.version !== 1) return false;
+  if (candidate.version !== 1 && candidate.version !== 2) return false;
   if (!Array.isArray(candidate.nodes) || !Array.isArray(candidate.edges)) return false;
 
   for (const node of candidate.nodes) {

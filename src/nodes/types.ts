@@ -15,9 +15,11 @@ export type NodeGroup =
   | 'Activation'
   | 'Combine'
   | 'Training'
+  | 'Model'
+  | 'Pipeline'
   | 'Utility';
 
-export type SocketDataType = 'tensor' | 'scalar' | 'optimizer' | 'dataset';
+export type SocketDataType = 'tensor' | 'scalar' | 'optimizer' | 'dataset' | 'model' | 'metrics';
 
 export interface NodeSocket {
   id: string; // socket identifier, e.g. "in", "out", "logits", "target"

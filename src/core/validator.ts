@@ -34,8 +34,17 @@ export interface WireValidation {
   to: string;
   status: WireStatus; // 🟢 valid, 🔴 error, ⚪ unknown
   shape: string; // e.g. "[B, 128]" or "unknown"
+  dataType?: 'dataset' | 'model' | 'metrics' | 'tensor' | 'scalar' | 'optimizer';
   message?: string;
   fixHint?: string;
+}
+
+export function inferSocketDataType(socketId: string): 'dataset' | 'model' | 'metrics' | 'tensor' {
+  const s = socketId.toLowerCase();
+  if (s === 'data' || s === 'train' || s === 'test' || s === 'train_data' || s === 'test_data') return 'dataset';
+  if (s === 'model' || s === 'trained_model') return 'model';
+  if (s === 'metrics' || s === 'history') return 'metrics';
+  return 'tensor';
 }
 
 export interface NodeValidationStatus {
@@ -156,7 +165,7 @@ export function validate(graph: Graph): ValidationResult {
     }
 
     // Infer output shapes
-    const shapeResult = inferNodeOutputShape(node.type, node.params, inputShapes);
+    const shapeResult = inferNodeOutputShape(node.type, node.params, inputShapes, node.layers);
 
     if (shapeResult.success) {
       computedOutputs.set(node.id, shapeResult.outputShapes);
@@ -177,12 +186,14 @@ export function validate(graph: Graph): ValidationResult {
         if (incomingEdge) {
           const shape = edgeSourceShapes.get(socketId) || 'unknown';
           const wireKey = `${incomingEdge.from}->${incomingEdge.to}`;
+          const fromRef = parseSocketRef(incomingEdge.from);
           wireStatuses.set(wireKey, {
             edgeKey: wireKey,
             from: incomingEdge.from,
             to: incomingEdge.to,
             status: shape === 'unknown' ? 'unknown' : 'valid',
             shape: formatShape(shape),
+            dataType: inferSocketDataType(fromRef.socketId),
           });
         }
       }
@@ -214,12 +225,14 @@ export function validate(graph: Graph): ValidationResult {
         if (incomingEdge) {
           const shape = edgeSourceShapes.get(socketId) || 'unknown';
           const wireKey = `${incomingEdge.from}->${incomingEdge.to}`;
+          const fromRef = parseSocketRef(incomingEdge.from);
           wireStatuses.set(wireKey, {
             edgeKey: wireKey,
             from: incomingEdge.from,
             to: incomingEdge.to,
             status: shape === 'unknown' ? 'unknown' : 'error',
             shape: formatShape(shape),
+            dataType: inferSocketDataType(fromRef.socketId),
             message: shapeResult.error,
             fixHint: shapeResult.fixHint,
           });
@@ -289,12 +302,12 @@ export function validate(graph: Graph): ValidationResult {
   }
 
   // Check 3c: Missing Loss node for training (🟡)
-  const hasLossNode = graph.nodes.some((n) => n.type === 'Loss');
-  if (graph.nodes.length > 0 && !hasLossNode) {
+  const hasLossOrClassifier = graph.nodes.some((n) => n.type === 'Loss' || n.type === 'Classifier');
+  if (graph.nodes.length > 0 && !hasLossOrClassifier) {
     problems.push({
       severity: 'warning',
-      message: 'Add a Loss node to train.',
-      fixHint: 'Add a Loss node and connect your model output to it.',
+      message: 'Add a Classifier or Loss node to train.',
+      fixHint: 'Add a Classifier node or Loss node to configure training loss.',
     });
   }
 
@@ -326,7 +339,14 @@ function getExpectedInputSockets(type: string): string[] {
     case 'MaxPool2D':
     case 'Dropout':
     case 'BatchNorm':
-      return ['in'];
+    case 'FeatureExtractor':
+    case 'Classifier':
+      return ['in', 'data'];
+    case 'Shuffle':
+    case 'TrainTestSplit':
+    case 'Normalize':
+    case 'Reshape':
+      return ['data', 'in'];
     case 'Add':
     case 'Concat':
       return ['in1', 'in2', 'a', 'b'];
@@ -334,16 +354,19 @@ function getExpectedInputSockets(type: string): string[] {
       return ['logits', 'target', 'in'];
     case 'Input':
     case 'Dataset':
+    case 'LoadDataset':
     case 'Optimizer':
       return [];
     case 'Train':
-      return ['loss', 'opt'];
+      return ['model', 'train_data', 'loss', 'opt'];
+    case 'Evaluate':
+      return ['trained_model', 'test_data'];
     case 'Metrics':
-      return ['metrics', 'in'];
+      return ['history', 'metrics', 'in'];
     case 'Predict':
-      return ['in'];
+      return ['trained_model', 'in'];
     default:
-      return ['in'];
+      return ['in', 'data'];
   }
 }
 
