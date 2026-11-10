@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Play, Square, Cpu, ShieldCheck } from 'lucide-react';
 import { TrainingWorkerState } from '../backends/tfjs/useTrainingWorker';
 import { useTrainingSafe } from '../backends/tfjs/TrainingContext';
@@ -13,7 +13,19 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ training: propTrai
   const contextTraining = useTrainingSafe();
   const training = propTraining || contextTraining;
   const graph = useGraphStore((state) => state.graph);
-  const validation = validate(graph);
+
+  const structuralKey = useMemo(() => {
+    return JSON.stringify({
+      nodes: graph.nodes.map((n) => ({ id: n.id, type: n.type, params: n.params, layers: n.layers })),
+      edges: graph.edges,
+    });
+  }, [graph.nodes, graph.edges]);
+
+  const validation = useMemo(() => {
+    return validate(graph);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [structuralKey]);
+
   const isGraphValid = validation.isValid && graph.nodes.length > 0;
 
   if (!training) return null;

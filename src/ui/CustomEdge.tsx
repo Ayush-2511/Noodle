@@ -16,7 +16,7 @@ export interface CustomEdgeData {
   fixHint?: string;
 }
 
-export const CustomEdge: React.FC<EdgeProps> = ({
+export const CustomEdge: React.FC<EdgeProps> = React.memo(({
   id,
   sourceX,
   sourceY,
@@ -158,4 +158,4 @@ export const CustomEdge: React.FC<EdgeProps> = ({
       </EdgeLabelRenderer>
     </>
   );
-};
+});

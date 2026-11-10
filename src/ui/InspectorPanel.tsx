@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Sliders,
   Code,
@@ -19,7 +19,11 @@ export const InspectorPanel: React.FC = () => {
   const selectedNodeId = useGraphStore((state) => state.selectedNodeId);
   const updateNodeParams = useGraphStore((state) => state.updateNodeParams);
   const removeNode = useGraphStore((state) => state.removeNode);
-  const jsonString = useGraphStore((state) => state.getCanonicalJson());
+
+  const jsonString = useMemo(() => {
+    if (activeTab !== 'json') return '';
+    return useGraphStore.getState().getCanonicalJson();
+  }, [activeTab, graph]);
 
   const selectedNode = graph.nodes.find((n) => n.id === selectedNodeId);
   const selectedDef = selectedNode ? getNodeDefinition(selectedNode.type) : null;

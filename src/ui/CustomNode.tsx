@@ -20,10 +20,9 @@ export interface CustomNodeData {
   [key: string]: unknown;
 }
 
-export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
+export const CustomNode: React.FC<NodeProps> = React.memo(({ id, data, selected }) => {
   const nodeData = data as unknown as CustomNodeData;
   const def = getNodeDefinition(nodeData.type);
-  const graph = useGraphStore((state) => state.graph);
   const updateNodeParams = useGraphStore((state) => state.updateNodeParams);
   const removeNode = useGraphStore((state) => state.removeNode);
   const training = useTrainingSafe();
@@ -31,8 +30,6 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
   const [isEvaluatingLocal, setIsEvaluatingLocal] = useState(false);
   const [evalError, setEvalError] = useState<string | null>(null);
   const [lastEvalTime, setLastEvalTime] = useState<string | null>(null);
-
-  const graphNode = graph.nodes.find((n) => n.id === id);
 
   const handleParamChange = useCallback(
     (key: string, value: any) => {
@@ -312,7 +309,7 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
           <LayerStack
             nodeId={id}
             builderType={nodeData.type as any}
-            layers={graphNode?.layers || []}
+            layers={(nodeData.layers as any) || []}
             inputShape={nodeData.outputShapes?.['in'] || (nodeData.type === 'FeatureExtractor' ? ['B', 1, 28, 28] : ['B', 784])}
           />
         )}
@@ -405,7 +402,8 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
                 setIsEvaluatingLocal(true);
                 setEvalError(null);
                 try {
-                  const res = await training.runEvaluation(graph);
+                  const currentGraph = useGraphStore.getState().graph;
+                  const res = await training.runEvaluation(currentGraph);
                   setLastEvalTime(res.evaluatedAt || new Date().toLocaleTimeString());
                 } catch (err: any) {
                   console.error('Real evaluation failed:', err);
@@ -658,7 +656,8 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  training.startTraining(graph, {
+                  const currentGraph = useGraphStore.getState().graph;
+                  training.startTraining(currentGraph, {
                     epochs: Number(nodeData.params.epochs) || 3,
                     batchSize: Number(nodeData.params.batch_size) || 32,
                   });
@@ -743,4 +742,4 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
       </div>
     </div>
   );
-};
+});

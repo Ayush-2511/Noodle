@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import {
   ReactFlow,
   Background,
@@ -9,6 +9,8 @@ import {
   Node,
   NodeChange,
   EdgeChange,
+  applyNodeChanges,
+  applyEdgeChanges,
 } from '@xyflow/react';
 import { CustomNode } from './CustomNode';
 import { CustomEdge } from './CustomEdge';
@@ -33,10 +35,24 @@ export const Editor: React.FC = () => {
   const updateNodePosition = useGraphStore((state) => state.updateNodePosition);
   const removeNodeFromStore = useGraphStore((state) => state.removeNode);
 
-  // Run pure validator on the canonical graph
+  // Structural fingerprint: excludes node positions so dragging never triggers graph re-validation
+  const structuralKey = useMemo(() => {
+    return JSON.stringify({
+      nodes: graph.nodes.map((n) => ({
+        id: n.id,
+        type: n.type,
+        params: n.params,
+        layers: n.layers,
+      })),
+      edges: graph.edges,
+    });
+  }, [graph.nodes, graph.edges]);
+
+  // Run pure validator only when topology, params, or layers actually change
   const validationResult = useMemo(() => {
     return validate(graph);
-  }, [graph]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [structuralKey]);
 
   // Convert canonical Graph nodes to React Flow nodes with validation status
   const rfNodes: Node[] = useMemo(() => {
@@ -87,6 +103,19 @@ export const Editor: React.FC = () => {
     });
   }, [graph.edges, validationResult]);
 
+  // Local React Flow state for buttery 120fps hardware-accelerated dragging
+  const [nodes, setNodes] = useState<Node[]>(rfNodes);
+  const [edges, setEdges] = useState<Edge[]>(rfEdges);
+
+  // Synchronize when canonical structure changes (nodes added/removed, params edited, selection)
+  useEffect(() => {
+    setNodes(rfNodes);
+  }, [rfNodes]);
+
+  useEffect(() => {
+    setEdges(rfEdges);
+  }, [rfEdges]);
+
   // Handle new wire connection
   const handleConnect = useCallback(
     (connection: Connection) => {
@@ -102,13 +131,13 @@ export const Editor: React.FC = () => {
     [addEdgeToStore]
   );
 
-  // Handle node drag, position update, and selection
+  // Handle local node drag without polluting the global store on every single frame
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
+      setNodes((nds) => applyNodeChanges(changes, nds));
+
       for (const change of changes) {
-        if (change.type === 'position' && change.position && change.id) {
-          updateNodePosition(change.id, change.position);
-        } else if (change.type === 'remove' && change.id) {
+        if (change.type === 'remove' && change.id) {
           removeNodeFromStore(change.id);
         } else if (change.type === 'select') {
           if (change.selected) {
@@ -119,12 +148,22 @@ export const Editor: React.FC = () => {
         }
       }
     },
-    [updateNodePosition, removeNodeFromStore, setSelectedNodeId, selectedNodeId]
+    [removeNodeFromStore, setSelectedNodeId, selectedNodeId]
+  );
+
+  // Commit the final position to persistent Zustand store only when dragging concludes!
+  const handleNodeDragStop = useCallback(
+    (_: any, node: Node) => {
+      updateNodePosition(node.id, node.position);
+    },
+    [updateNodePosition]
   );
 
   // Handle edge deletions
   const handleEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
+      setEdges((eds) => applyEdgeChanges(changes, eds));
+
       for (const change of changes) {
         if (change.type === 'remove' && change.id) {
           const edge = rfEdges.find((e) => e.id === change.id);
@@ -142,13 +181,14 @@ export const Editor: React.FC = () => {
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <ReactFlow
-        nodes={rfNodes}
-        edges={rfEdges}
+        nodes={nodes}
+        edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onConnect={handleConnect}
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
+        onNodeDragStop={handleNodeDragStop}
         onNodeClick={(_, node) => setSelectedNodeId(node.id)}
         onPaneClick={() => setSelectedNodeId(null)}
         fitView
