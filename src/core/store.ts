@@ -8,9 +8,13 @@ import {
   parseSocketRef,
 } from './graph';
 
+export type WorkspaceTab = 'canvas' | 'dataset';
+
 export interface GraphState {
   graph: Graph;
   selectedNodeId: string | null;
+  activeWorkspaceTab: WorkspaceTab;
+  setActiveWorkspaceTab: (tab: WorkspaceTab) => void;
 
   // Actions
   addNode: (type: string, params?: NodeParams, position?: { x: number; y: number }, layers?: LayerEntry[]) => string;
@@ -113,6 +117,11 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     edges: [],
   },
   selectedNodeId: null,
+  activeWorkspaceTab: 'canvas',
+
+  setActiveWorkspaceTab: (tab: WorkspaceTab) => {
+    set({ activeWorkspaceTab: tab });
+  },
 
   addNode: (type: string, params: NodeParams = {}, position = { x: 100, y: 100 }, layers?: LayerEntry[]) => {
     let newId = '';

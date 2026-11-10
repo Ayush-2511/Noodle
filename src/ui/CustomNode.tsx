@@ -258,10 +258,36 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
                 </div>
               ))}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#94a3b8' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#94a3b8', marginBottom: 6 }}>
               <span>60,000 samples</span>
               <span>28×28 grayscale</span>
             </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                useGraphStore.getState().setActiveWorkspaceTab('dataset');
+              }}
+              style={{
+                width: '100%',
+                padding: '4px 8px',
+                backgroundColor: '#1e293b',
+                color: '#38bdf8',
+                border: '1px solid #0284c7',
+                borderRadius: 4,
+                fontSize: '0.72rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 5,
+                transition: 'background-color 0.15s ease',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1e293b')}
+            >
+              <span>📊 Open Dataset Inspector</span>
+            </button>
           </div>
         )}
 
