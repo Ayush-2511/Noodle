@@ -64,6 +64,7 @@ export const PredictCanvas: React.FC<PredictCanvasProps> = () => {
 
   const training = useTrainingSafe();
   const graph = useGraphStore((state) => state.graph);
+  const customDataset = useGraphStore((state) => state.customDataset);
 
   const trainingRef = useRef(training);
   trainingRef.current = training;
@@ -74,7 +75,32 @@ export const PredictCanvas: React.FC<PredictCanvasProps> = () => {
   const datasetNode = graph.nodes.find((n) => n.type === 'LoadDataset' || n.type === 'Dataset');
   const datasetId = String(datasetNode?.params.dataset || datasetNode?.params.name || 'mnist');
   const meta = getDatasetMeta(datasetId);
-  const classes = meta.classes;
+
+  // Dynamic classes: prioritize custom dataset ground-truth labels if available
+  const classes = React.useMemo(() => {
+    if (customDataset && customDataset.rows.length > 0) {
+      const targetIdx = customDataset.headers.indexOf(customDataset.targetColumn);
+      const lIdx = targetIdx >= 0 ? targetIdx : customDataset.headers.length - 1;
+      const unique = Array.from(new Set(customDataset.rows.map((r) => r[lIdx]))).filter(
+        (v) => v !== undefined && v !== null && v !== ''
+      );
+      if (unique.length > 1) {
+        const sorted = unique.sort((a, b) => {
+          const na = Number(a), nb = Number(b);
+          if (!isNaN(na) && !isNaN(nb)) return na - nb;
+          return String(a).localeCompare(String(b));
+        });
+        const allDigits = sorted.every((v) => !isNaN(Number(v)));
+        if (allDigits && customDataset.name.toLowerCase().includes('fashion')) {
+          return ['T-shirt', 'Trouser', 'Pullover', 'Dress', 'Coat', 'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot'];
+        }
+        return sorted.map(String);
+      }
+      return meta.classes;
+    }
+    return meta.classes;
+  }, [customDataset, meta.classes]);
+
   const isCifar = meta.id === 'cifar10';
   const targetW = isCifar ? 32 : 28;
   const targetH = isCifar ? 32 : 28;
@@ -119,9 +145,37 @@ export const PredictCanvas: React.FC<PredictCanvasProps> = () => {
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      const d = targetDigit !== undefined ? targetDigit : Math.floor(Math.random() * 10);
-      const seed = Math.floor(Math.random() * 1000);
-      const sample = getAuthenticSample('mnist', d + seed * 10);
+      let pixelData: number[] | Float32Array;
+
+      if (customDataset && customDataset.rows.length > 0) {
+        const targetIdx = customDataset.headers.indexOf(customDataset.targetColumn);
+        const lIdx = targetIdx >= 0 ? targetIdx : customDataset.headers.length - 1;
+
+        let matchingRows = customDataset.rows;
+        if (targetDigit !== undefined) {
+          const filtered = customDataset.rows.filter((r) => Number(r[lIdx]) === targetDigit);
+          if (filtered.length > 0) matchingRows = filtered;
+        }
+
+        const randomRow = matchingRows[Math.floor(Math.random() * matchingRows.length)];
+        const pArr: number[] = [];
+        let hasLarge = false;
+
+        for (let c = 0; c < randomRow.length && pArr.length < 784; c++) {
+          if (c !== lIdx) {
+            const v = Number(randomRow[c]) || 0;
+            if (v > 1.0) hasLarge = true;
+            pArr.push(v);
+          }
+        }
+
+        pixelData = hasLarge ? pArr.map((v) => v / 255.0) : pArr;
+      } else {
+        const d = targetDigit !== undefined ? targetDigit : Math.floor(Math.random() * 10);
+        const seed = Math.floor(Math.random() * 1000);
+        const sample = getAuthenticSample(datasetId, d + seed * 10);
+        pixelData = sample.pixels;
+      }
 
       const offscreen = document.createElement('canvas');
       offscreen.width = 28;
@@ -131,7 +185,7 @@ export const PredictCanvas: React.FC<PredictCanvasProps> = () => {
 
       const imgData = offCtx.createImageData(28, 28);
       for (let i = 0; i < 784; i++) {
-        const v = Math.min(255, Math.max(0, Math.round((sample.pixels[i] ?? 0) * 255)));
+        const v = Math.min(255, Math.max(0, Math.round((pixelData[i] ?? 0) * 255)));
         imgData.data[i * 4 + 0] = v;
         imgData.data[i * 4 + 1] = v;
         imgData.data[i * 4 + 2] = v;
@@ -146,7 +200,7 @@ export const PredictCanvas: React.FC<PredictCanvasProps> = () => {
 
       triggerRealPrediction(canvas);
     },
-    [triggerRealPrediction]
+    [customDataset, datasetId, triggerRealPrediction]
   );
 
   // Render a specific test sample onto the canvas
@@ -188,6 +242,48 @@ export const PredictCanvas: React.FC<PredictCanvasProps> = () => {
 
   // Switch to Test Samples mode and load samples if needed
   const loadTestSamples = useCallback(async () => {
+    if (customDataset && customDataset.rows.length > 0) {
+      const targetIdx = customDataset.headers.indexOf(customDataset.targetColumn);
+      const lIdx = targetIdx >= 0 ? targetIdx : customDataset.headers.length - 1;
+
+      // Extract held-out test split (last 20% of dataset), or up to 50 samples
+      const trainSplit = Math.floor(customDataset.rows.length * 0.8);
+      const testRows = customDataset.rows.slice(trainSplit);
+      const pool = testRows.length > 0 ? testRows : customDataset.rows;
+      const sampleCount = Math.min(50, pool.length);
+
+      const samples: TestSample[] = [];
+      for (let i = 0; i < sampleCount; i++) {
+        const row = pool[i];
+        const rawLabel = Number(row[lIdx]);
+        const trueClass = isNaN(rawLabel) ? 0 : rawLabel;
+        const pArr: number[] = [];
+        let hasLarge = false;
+
+        for (let c = 0; c < row.length && pArr.length < 784; c++) {
+          if (c !== lIdx) {
+            const v = Number(row[c]) || 0;
+            if (v > 1.0) hasLarge = true;
+            pArr.push(v);
+          }
+        }
+
+        const normalizedPixels = hasLarge ? pArr.map((v) => v / 255.0) : pArr;
+        samples.push({
+          index: i,
+          trueClass,
+          pixels: normalizedPixels,
+        });
+      }
+
+      setTestSamples(samples);
+      if (samples.length > 0) {
+        setCurrentSampleIdx(0);
+        renderTestSample(samples[0]);
+      }
+      return;
+    }
+
     if (!trainingRef.current) return;
     setIsLoadingSamples(true);
     try {
@@ -202,16 +298,16 @@ export const PredictCanvas: React.FC<PredictCanvasProps> = () => {
     } finally {
       setIsLoadingSamples(false);
     }
-  }, [renderTestSample]);
+  }, [customDataset, renderTestSample]);
 
   // Handle switching tabs
   const handleModeChange = (newMode: PredictMode) => {
     setMode(newMode);
     if (newMode === 'draw') {
       clearCanvas();
-      drawRandomSample(7);
+      drawRandomSample();
     } else if (newMode === 'samples') {
-      if (testSamples.length === 0) {
+      if (testSamples.length === 0 || customDataset) {
         loadTestSamples();
       } else {
         renderTestSample(testSamples[currentSampleIdx]);
@@ -253,11 +349,19 @@ export const PredictCanvas: React.FC<PredictCanvasProps> = () => {
     reader.readAsDataURL(file);
   };
 
-  // Initialize once on mount with sample digit 7
+  // Initialize on mount or when custom dataset changes
   useEffect(() => {
-    drawRandomSample(7);
+    if (customDataset && customDataset.rows.length > 0) {
+      if (mode === 'samples') {
+        loadTestSamples();
+      } else {
+        drawRandomSample();
+      }
+    } else {
+      drawRandomSample(7);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [customDataset]);
 
   const getCanvasCoords = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -319,7 +423,7 @@ export const PredictCanvas: React.FC<PredictCanvasProps> = () => {
       : '';
 
   const activeSample = testSamples[currentSampleIdx];
-  const trueLabelName = activeSample && classes[activeSample.trueClass] ? classes[activeSample.trueClass] : null;
+  const trueLabelName = activeSample ? (classes[activeSample.trueClass] ?? String(activeSample.trueClass)) : null;
   const isCorrect = trueLabelName && displayLabel === trueLabelName;
 
   return (
