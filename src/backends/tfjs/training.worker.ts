@@ -10,6 +10,7 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
+import '@tensorflow/tfjs-backend-webgpu';
 import { compileGraphToTfjs } from './modelCompiler';
 import { generateSyntheticMnist, MnistData } from './mnistLoader';
 import { Graph } from '../../core/graph';
@@ -19,7 +20,97 @@ export interface WorkerTrainingConfig {
   epochs?: number;
   batchSize?: number;
   sampleCount?: number;
+  preferredBackend?: 'auto' | 'webgpu' | 'webgl' | 'cpu';
 }
+
+let initializedBackend: string | null = null;
+
+/**
+ * Initializes and activates the requested or highest-capability hardware acceleration backend:
+ * 1. WebGPU (DirectX 12 / Vulkan modern compute shaders)
+ * 2. WebGL (Direct3D shaders via ANGLE)
+ * 3. CPU (Thread-pool fallback)
+ */
+export async function ensureBackend(preferred?: 'auto' | 'webgpu' | 'webgl' | 'cpu'): Promise<string> {
+  const req = preferred || 'auto';
+
+  if (req === 'webgpu') {
+    try {
+      await tf.setBackend('webgpu');
+      await tf.ready();
+      initializedBackend = 'webgpu';
+      return 'webgpu';
+    } catch (err) {
+      console.warn('[Noodle Worker] Requested WebGPU failed, attempting fallback:', err);
+    }
+  } else if (req === 'webgl') {
+    try {
+      await tf.setBackend('webgl');
+      await tf.ready();
+      initializedBackend = 'webgl';
+      return 'webgl';
+    } catch (err) {
+      console.warn('[Noodle Worker] Requested WebGL failed, attempting fallback:', err);
+    }
+  } else if (req === 'cpu') {
+    try {
+      await tf.setBackend('cpu');
+      await tf.ready();
+      initializedBackend = 'cpu';
+      return 'cpu';
+    } catch (err) {
+      console.error('[Noodle Worker] CPU backend initialization failed:', err);
+    }
+  }
+
+  if (initializedBackend && req === 'auto') {
+    return initializedBackend;
+  }
+
+  // Auto-detection strategy: prioritize GPU hardware acceleration
+  // 1. Try WebGPU (DirectX 12 / Vulkan)
+  try {
+    if (typeof navigator !== 'undefined' && (navigator as any).gpu) {
+      await tf.setBackend('webgpu');
+      await tf.ready();
+      initializedBackend = 'webgpu';
+      console.log('[Noodle Worker] GPU acceleration active: WebGPU (DirectX 12 / Vulkan)');
+      return 'webgpu';
+    }
+  } catch (err) {
+    console.warn('[Noodle Worker] WebGPU adapter not available in worker context, trying WebGL...');
+  }
+
+  // 2. Try WebGL (Direct3D / OpenGL shaders)
+  try {
+    await tf.setBackend('webgl');
+    await tf.ready();
+    initializedBackend = 'webgl';
+    console.log('[Noodle Worker] GPU acceleration active: WebGL');
+    return 'webgl';
+  } catch (err) {
+    console.warn('[Noodle Worker] WebGL context not available, falling back to CPU:', err);
+  }
+
+  // 3. Fallback to CPU
+  try {
+    await tf.setBackend('cpu');
+    await tf.ready();
+    initializedBackend = 'cpu';
+    console.log('[Noodle Worker] Running on CPU backend');
+    return 'cpu';
+  } catch {
+    return tf.getBackend() || 'cpu';
+  }
+}
+
+// Auto-probe hardware backend on worker launch
+ensureBackend('auto').then((b) => {
+  self.postMessage({
+    type: 'BACKEND_INITIALIZED',
+    backend: b,
+  });
+});
 
 export interface StartTrainingMessage {
   type: 'START_TRAINING';
@@ -376,6 +467,9 @@ self.onmessage = async (e: MessageEvent<TrainingInMessage>) => {
     try {
       cleanupSession();
 
+      // Ensure optimal hardware acceleration backend is active
+      const activeBackend = await ensureBackend(msg.config?.preferredBackend);
+
       // 1. Compile model from canonical Graph JSON
       const compiled = compileGraphToTfjs(msg.graph);
       activeModel = compiled.model;
@@ -385,7 +479,7 @@ self.onmessage = async (e: MessageEvent<TrainingInMessage>) => {
       self.postMessage({
         type: 'TRAINING_STARTED',
         numTensors: initialTensors,
-        backend: tf.getBackend(),
+        backend: activeBackend,
       });
 
       const expectedShape = model.inputs[0]?.shape;

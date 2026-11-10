@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Play, Square, Cpu, ShieldCheck } from 'lucide-react';
+import { Play, Square, Cpu, Zap, ShieldCheck } from 'lucide-react';
 import { TrainingWorkerState } from '../backends/tfjs/useTrainingWorker';
 import { useTrainingSafe } from '../backends/tfjs/TrainingContext';
 import { useGraphStore } from '../core/store';
@@ -143,9 +143,36 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ training: propTrai
 
       {/* Right: Environment & Security Status */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, color: '#666666', fontSize: '0.68rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <Cpu size={12} color="#0078d4" />
-          <span>TensorFlow.js ({(training.backend || 'cpu').toUpperCase()})</span>
+        <div
+          title={
+            training.backend === 'webgpu'
+              ? 'Hardware Accelerated via WebGPU (DirectX 12 / Vulkan compute shaders)'
+              : training.backend === 'webgl'
+              ? 'Hardware Accelerated via WebGL (Direct3D shaders)'
+              : 'Running on CPU thread pool'
+          }
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            padding: '1px 6px',
+            borderRadius: 3,
+            backgroundColor: training.backend === 'webgpu' || training.backend === 'webgl' ? 'rgba(16, 124, 65, 0.15)' : 'transparent',
+            border: training.backend === 'webgpu' || training.backend === 'webgl' ? '1px solid #107c41' : '1px solid transparent',
+          }}
+        >
+          {training.backend === 'webgpu' || training.backend === 'webgl' ? (
+            <Zap size={11} color="#4ade80" />
+          ) : (
+            <Cpu size={12} color="#0078d4" />
+          )}
+          <span style={{ color: training.backend === 'webgpu' || training.backend === 'webgl' ? '#4ade80' : '#888888', fontWeight: 600 }}>
+            {training.backend === 'webgpu'
+              ? 'GPU: WebGPU (DirectX 12)'
+              : training.backend === 'webgl'
+              ? 'GPU: WebGL Shaders'
+              : 'Compute: CPU'}
+          </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <ShieldCheck size={12} color="#107c41" />

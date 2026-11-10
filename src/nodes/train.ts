@@ -18,6 +18,7 @@ export const trainNodeDef: NodeDefinition = {
     lr: 0.001,
     epochs: 10,
     batch_size: 32,
+    device: 'auto',
   },
   inputs: [
     {
@@ -96,6 +97,18 @@ export const trainNodeDef: NodeDefinition = {
       max: 512,
       step: 8,
       help: 'Number of training samples processed before updating weights.',
+    },
+    {
+      key: 'device',
+      label: 'Compute Device',
+      type: 'select',
+      options: [
+        { label: 'Auto (GPU Preferred)', value: 'auto' },
+        { label: 'WebGPU (DirectX 12 / Vulkan)', value: 'webgpu' },
+        { label: 'WebGL (GPU Shaders)', value: 'webgl' },
+        { label: 'CPU (Multi-Threaded Worker)', value: 'cpu' },
+      ],
+      help: 'Hardware execution device. WebGPU uses DirectX 12 / Vulkan compute shaders on your GPU.',
     },
   ],
 };

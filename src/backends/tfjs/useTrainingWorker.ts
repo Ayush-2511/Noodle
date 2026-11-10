@@ -88,6 +88,10 @@ export function useTrainingWorker(): TrainingWorkerState {
         const msg = e.data;
 
         switch (msg.type) {
+          case 'BACKEND_INITIALIZED':
+            if (msg.backend) setBackend(msg.backend);
+            break;
+
           case 'TRAINING_STARTED':
             setStatus('training');
             setErrorMessage(null);
@@ -230,11 +234,19 @@ export function useTrainingWorker(): TrainingWorkerState {
     setErrorMessage(null);
     setLatestLoss(null);
     setLatestAccuracy(null);
+
+    const trainNode = graph.nodes.find((n) => n.type === 'Train');
+    const deviceParam = (trainNode?.params?.device as any) || 'auto';
+    const finalConfig: WorkerTrainingConfig = {
+      ...config,
+      preferredBackend: config?.preferredBackend || deviceParam,
+    };
+
     const customData = useGraphStore.getState().customDataset;
     workerRef.current.postMessage({
       type: 'START_TRAINING',
       graph,
-      config,
+      config: finalConfig,
       customData,
     });
   }, []);

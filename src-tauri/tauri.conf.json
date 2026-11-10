@@ -19,7 +19,8 @@
         "minHeight": 640,
         "center": true,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "additionalBrowserArgs": "--enable-unsafe-webgpu --enable-features=Vulkan --use-webgpu-adapter=default"
       }
     ],
     "security": {
