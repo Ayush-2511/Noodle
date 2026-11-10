@@ -28,6 +28,7 @@ const CATEGORY_META: Record<string, { label: string; icon: LucideIcon }> = {
 };
 
 const CATEGORY_ORDER = ['Data', 'Pipeline', 'Model', 'Layers', 'Activation', 'Combine', 'Training'];
+const ALL_NODE_DEFINITIONS = getAllNodeDefinitions();
 
 export const NodePalette: React.FC = () => {
   const [search, setSearch] = useState('');
@@ -35,7 +36,7 @@ export const NodePalette: React.FC = () => {
 
   const addNode = useGraphStore((state) => state.addNode);
   const existingNodes = useGraphStore((state) => state.graph.nodes);
-  const definitions = getAllNodeDefinitions();
+  const definitions = ALL_NODE_DEFINITIONS;
 
   const toggleGroup = (group: string) => {
     setCollapsedGroups((prev) => ({ ...prev, [group]: !prev[group] }));

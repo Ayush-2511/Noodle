@@ -107,6 +107,9 @@ export function validate(graph: Graph): ValidationResult {
 
   const executionOrder = topoResult.sortedNodeIds;
 
+  // Fast O(1) node lookup map
+  const nodeMap = new Map(graph.nodes.map((n) => [n.id, n]));
+
   // Map to store verified output shapes: nodeId -> socketId -> TensorShape
   const computedOutputs = new Map<string, Record<string, TensorShape>>();
 
@@ -136,7 +139,7 @@ export function validate(graph: Graph): ValidationResult {
 
   // 2. Process nodes in topological execution order
   for (const nodeId of executionOrder) {
-    const node = graph.nodes.find((n) => n.id === nodeId);
+    const node = nodeMap.get(nodeId);
     if (!node) continue;
 
     // Collect incoming tensor shapes for this node
@@ -248,8 +251,8 @@ export function validate(graph: Graph): ValidationResult {
     try {
       const fromRef = parseSocketRef(edge.from);
       const toRef = parseSocketRef(edge.to);
-      const fromNode = graph.nodes.find((n) => n.id === fromRef.nodeId);
-      const toNode = graph.nodes.find((n) => n.id === toRef.nodeId);
+      const fromNode = nodeMap.get(fromRef.nodeId);
+      const toNode = nodeMap.get(toRef.nodeId);
 
       if (
         fromNode &&

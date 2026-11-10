@@ -71,20 +71,31 @@ function convertCustomDatasetToTensors(
 
   const targetColIdx = customData.headers.indexOf(customData.targetColumn);
   const targetIdx = targetColIdx >= 0 ? targetColIdx : customData.headers.length - 1;
+  const numCols = customData.headers.length;
+  const numFeatures = numCols - 1;
 
-  const rawFeatures: number[][] = [];
-  const rawLabels: number[] = [];
+  if (numFeatures <= 0) return null;
+
+  // High-performance typed buffers: avoids allocating tens of thousands of nested JS array objects
+  const flatFeatures = new Float32Array(numRows * numFeatures);
+  const flatLabels = new Int32Array(numRows);
   const classMap = new Map<string, number>();
+
+  let hasLargeValues = false;
 
   for (let i = 0; i < numRows; i++) {
     const row = customData.rows[i];
-    const featRow: number[] = [];
-    for (let c = 0; c < row.length; c++) {
+    const featOffset = i * numFeatures;
+    let fIdx = 0;
+
+    for (let c = 0; c < numCols; c++) {
       if (c === targetIdx) continue;
       const v = Number(row[c]);
-      featRow.push(isNaN(v) ? 0 : v);
+      const safeVal = isNaN(v) ? 0 : v;
+      if (safeVal > 1.0) hasLargeValues = true;
+      flatFeatures[featOffset + fIdx] = safeVal;
+      fIdx++;
     }
-    rawFeatures.push(featRow);
 
     const rawTarget = row[targetIdx];
     let labelNum = Number(rawTarget);
@@ -95,37 +106,24 @@ function convertCustomDatasetToTensors(
       }
       labelNum = classMap.get(str)!;
     }
-    rawLabels.push(labelNum);
+    flatLabels[i] = labelNum;
   }
 
-  // Ensure one-hot depth strictly matches the neural network output layer units
+  // Auto-normalize pixel brightness if 784 features (MNIST/Fashion) and values exceed 1.0 (e.g. 0-255 pixels)
+  if (numFeatures === 784 && hasLargeValues) {
+    for (let p = 0; p < flatFeatures.length; p++) {
+      flatFeatures[p] /= 255.0;
+    }
+  }
+
   const numClasses = expectedOutputClasses || 10;
-  const numFeatures = rawFeatures[0]?.length || 0;
-
-  // Auto-normalize pixel brightness if 784 features and values exceed 1.0
-  if (numFeatures === 784) {
-    let hasLargeValues = false;
-    for (let i = 0; i < Math.min(10, numRows); i++) {
-      if (rawFeatures[i].some((v) => v > 1.0)) {
-        hasLargeValues = true;
-        break;
-      }
-    }
-    if (hasLargeValues) {
-      for (let i = 0; i < numRows; i++) {
-        for (let j = 0; j < 784; j++) {
-          rawFeatures[i][j] /= 255.0;
-        }
-      }
-    }
-  }
-
   const trainSplit = Math.max(1, Math.floor(numRows * 0.8));
   const testSplit = numRows - trainSplit;
 
   return tf.tidy(() => {
-    const allX = tf.tensor2d(rawFeatures);
-    const allY = tf.oneHot(tf.tensor1d(rawLabels, 'int32'), numClasses);
+    // Instant tensor construction directly from flat memory buffers
+    const allX = tf.tensor2d(flatFeatures, [numRows, numFeatures]);
+    const allY = tf.oneHot(tf.tensor1d(flatLabels, 'int32'), numClasses);
 
     let trainX = allX.slice([0, 0], [trainSplit, -1]);
     const trainY = allY.slice([0, 0], [trainSplit, -1]);

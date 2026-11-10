@@ -13,14 +13,22 @@ export const TableView: React.FC<TableViewProps> = ({ dataset }) => {
   const [page, setPage] = useState(0);
   const pageSize = 25;
 
-  // Filter rows based on search
+  // Filter rows based on search (optimized to avoid checking hundreds of raw image pixel columns)
   const filteredRows = useMemo(() => {
     let list = dataset.rows;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      list = list.filter((row) =>
-        row.some((cell) => String(cell).toLowerCase().includes(q))
-      );
+      const targetIdx = dataset.headers.indexOf(dataset.targetColumn);
+      const isWideImage = dataset.headers.length > 50;
+
+      list = list.filter((row) => {
+        if (isWideImage) {
+          // For 784-pixel image datasets, search only the target/label column to prevent 47M string conversions
+          const labelVal = targetIdx >= 0 ? row[targetIdx] : row[row.length - 1];
+          return String(labelVal).toLowerCase().includes(q);
+        }
+        return row.some((cell) => String(cell).toLowerCase().includes(q));
+      });
     }
 
     if (sortCol) {
@@ -40,14 +48,20 @@ export const TableView: React.FC<TableViewProps> = ({ dataset }) => {
     }
 
     return list;
-  }, [dataset.rows, dataset.headers, searchQuery, sortCol, sortAsc]);
+  }, [dataset.rows, dataset.headers, dataset.targetColumn, searchQuery, sortCol, sortAsc]);
 
   const maxPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
   const currentRows = filteredRows.slice(page * pageSize, (page + 1) * pageSize);
 
   // Column statistics (min, max, mean for numeric columns)
+  // Performance optimization: skip on 784-pixel image datasets to prevent 47-million iteration UI lockups
   const columnStats = useMemo(() => {
+    const isWideImage = dataset.headers.length > 50;
+    if (isWideImage) return {};
+
     const stats: Record<string, { min: number; max: number; mean: number; count: number } | null> = {};
+    const sampleLimit = Math.min(dataset.rows.length, 2000);
+
     for (let c = 0; c < dataset.headers.length; c++) {
       const header = dataset.headers[c];
       let min = Infinity;
@@ -55,7 +69,7 @@ export const TableView: React.FC<TableViewProps> = ({ dataset }) => {
       let sum = 0;
       let numericCount = 0;
 
-      for (let r = 0; r < dataset.rows.length; r++) {
+      for (let r = 0; r < sampleLimit; r++) {
         const val = dataset.rows[r][c];
         if (typeof val === 'number') {
           if (val < min) min = val;

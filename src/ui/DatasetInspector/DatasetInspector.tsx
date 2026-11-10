@@ -3,7 +3,6 @@ import { DatasetStatsBar } from './DatasetStatsBar';
 import { ImageGalleryView } from './ImageGalleryView';
 import { TableView } from './TableView';
 import { getDatasetMeta } from '../../core/datasets';
-import { TabularDataset } from '../../core/authenticDatasets';
 import { useGraphStore } from '../../core/store';
 import { importCustomDatasetDialog } from '../../core/datasetImporter';
 
@@ -21,10 +20,9 @@ export const DatasetInspector: React.FC<DatasetInspectorProps> = ({ onReturnToCa
   const activeDatasetId = (loadDatasetNode?.params?.dataset as string) || (customDataset ? 'custom_csv' : 'mnist');
 
   const [currentId, setCurrentId] = useState<string>(activeDatasetId);
-  const [localTabular, setLocalTabular] = useState<TabularDataset | null>(null);
   const [viewMode, setViewMode] = useState<'gallery' | 'table'>('gallery');
 
-  const activeCustom = customDataset || localTabular;
+  const activeCustom = customDataset;
 
   // Sync with graph if LoadDataset node changes
   useEffect(() => {
@@ -36,7 +34,6 @@ export const DatasetInspector: React.FC<DatasetInspectorProps> = ({ onReturnToCa
   // Handle switching datasets
   const handleSelectDataset = (id: string) => {
     setCurrentId(id);
-    setLocalTabular(null);
     if (id !== 'custom_csv') {
       useGraphStore.getState().setCustomDataset(null);
     }
@@ -60,7 +57,6 @@ export const DatasetInspector: React.FC<DatasetInspectorProps> = ({ onReturnToCa
   const handleImportLocal = useCallback(async () => {
     const res = await importCustomDatasetDialog();
     if (res) {
-      setLocalTabular(res.parsed);
       setCurrentId('custom_csv');
       useGraphStore.getState().setCustomDataset(res.parsed);
       const isImg = res.parsed.featureColumns.length === 784;

@@ -7,16 +7,6 @@
  * organic visual samples matching real-world MNIST & Fashion-MNIST.
  */
 
-export interface SampleItem {
-  id: number;
-  label: number;
-  className: string;
-  pixels: Float32Array; // Normalized [0, 1]
-  width: number;
-  height: number;
-  channels: number;
-}
-
 export interface TabularDataset {
   name: string;
   headers: string[];
@@ -24,16 +14,6 @@ export interface TabularDataset {
   featureColumns: string[];
   targetColumn: string;
   rowCount: number;
-}
-
-export interface LocalDatasetState {
-  type: 'builtin' | 'local_images' | 'local_csv';
-  name: string;
-  sourcePath?: string;
-  modality: 'image' | 'tabular';
-  sampleCount: number;
-  classes: string[];
-  tabular?: TabularDataset;
 }
 
 function distToSegment(
