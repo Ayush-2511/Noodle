@@ -183,8 +183,8 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ isOpen, onClose }) => {
                       </span>
                     </div>
                     {p.fixHint && (
-                      <div style={{ color: '#94a3b8', fontSize: '0.7rem', paddingLeft: 20 }}>
-                        💡 {p.fixHint}
+                      <div style={{ color: '#888888', fontSize: '0.7rem', paddingLeft: 20 }}>
+                        Hint: {p.fixHint}
                       </div>
                     )}
                   </div>
@@ -216,7 +216,29 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ isOpen, onClose }) => {
                     <td style={{ padding: '6px', color: '#22c55e' }}>{formatShape(outShape)}</td>
                     <td style={{ padding: '6px', color: '#cbd5e1' }}>{(status?.paramCount || 0).toLocaleString()}</td>
                     <td style={{ padding: '6px' }}>
-                      {status?.status === 'ok' ? '🟢 OK' : status?.status === 'warning' ? '🟡 Warning' : '🔴 Error'}
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          padding: '2px 6px',
+                          borderRadius: 3,
+                          fontSize: '0.68rem',
+                          backgroundColor:
+                            status?.status === 'ok'
+                              ? 'rgba(16, 124, 65, 0.2)'
+                              : status?.status === 'warning'
+                              ? 'rgba(216, 59, 1, 0.2)'
+                              : 'rgba(232, 17, 35, 0.2)',
+                          color:
+                            status?.status === 'ok'
+                              ? '#107c41'
+                              : status?.status === 'warning'
+                              ? '#d83b01'
+                              : '#f48771',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {status?.status === 'ok' ? 'OK' : status?.status === 'warning' ? 'Warning' : 'Error'}
+                      </span>
                     </td>
                   </tr>
                 );

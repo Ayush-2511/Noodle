@@ -96,14 +96,14 @@ export const TableView: React.FC<TableViewProps> = ({ dataset }) => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          backgroundColor: '#0f172a',
+          backgroundColor: '#1e1e1e',
           padding: '8px 12px',
-          borderRadius: '8px',
-          border: '1px solid #1e293b',
+          borderRadius: '4px',
+          border: '1px solid #2d2d2d',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '360px' }}>
-          <Search size={14} color="#64748b" />
+          <Search size={13} color="#666666" />
           <input
             type="text"
             value={searchQuery}
@@ -113,11 +113,11 @@ export const TableView: React.FC<TableViewProps> = ({ dataset }) => {
             }}
             placeholder="Search rows..."
             style={{
-              backgroundColor: '#1e293b',
-              border: '1px solid #334155',
-              borderRadius: '6px',
-              padding: '4px 10px',
-              color: '#f8fafc',
+              backgroundColor: '#141414',
+              border: '1px solid #333333',
+              borderRadius: '3px',
+              padding: '4px 8px',
+              color: '#ffffff',
               fontSize: '0.75rem',
               width: '100%',
               outline: 'none',

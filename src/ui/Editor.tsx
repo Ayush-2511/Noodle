@@ -159,8 +159,8 @@ export const Editor: React.FC = () => {
         <Background
           variant={BackgroundVariant.Dots}
           gap={20}
-          size={1.5}
-          color="#334155"
+          size={1.2}
+          color="#262626"
         />
         <Controls position="bottom-right" showInteractive={false} />
       </ReactFlow>

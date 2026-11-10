@@ -127,7 +127,7 @@ export const DatasetInspector: React.FC<DatasetInspectorProps> = ({ onReturnToCa
         flexDirection: 'column',
         width: '100%',
         height: '100%',
-        backgroundColor: '#0b0f19',
+        backgroundColor: '#181818',
         overflow: 'hidden',
       }}
     >

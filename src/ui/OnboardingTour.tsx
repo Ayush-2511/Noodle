@@ -11,28 +11,28 @@ interface Step {
 
 const STEPS: Step[] = [
   {
-    title: 'Welcome to Noodle 🍜',
+    title: 'Welcome to Noodle Studio',
     badge: 'Introduction',
     content:
-      'Noodle is an interactive deep learning workshop where every layer of a neural network is a visual node on your canvas. You can build, wire, inspect tensor shapes, and train real models on your device in real time.',
-    tip: 'No cloud GPUs or installations required — everything runs in your browser via Web Workers and TensorFlow.js.',
-    icon: <Sparkles size={24} color="#38bdf8" />,
+      'Noodle is a professional visual deep learning environment where every layer of a neural network is an engineering node on your canvas. Build, wire, inspect tensor shapes, and train real models directly on your Windows desktop.',
+    tip: 'Everything runs 100% locally on-device via native acceleration and WebAssembly.',
+    icon: <Sparkles size={24} color="#0078d4" />,
   },
   {
-    title: 'Your Building Blocks (Left Palette)',
-    badge: 'The Layers',
+    title: 'Component Library (Left Explorer)',
+    badge: 'Components',
     content:
-      'On the left is the Layer Palette. Click any layer (e.g. Dataset, Conv2D, Linear, Activation) to place it on the canvas. Use the search bar at the top to filter layers instantly by name or function.',
-    tip: 'Start every vision network with a Dataset node (MNIST), or use Input for custom tensor dimensions.',
-    icon: <Layers size={24} color="#34d399" />,
+      'The left toolbox organizes layers into Data, Pipeline, Architecture, Training, and Evaluation. Click any component or drag it to place it on the canvas. Use Ctrl+K to search components instantly.',
+    tip: 'Start every vision network with a Dataset node, or use Input for custom tensor dimensions.',
+    icon: <Layers size={24} color="#0078d4" />,
   },
   {
-    title: 'Sockets, Wires & Live Shapes',
-    badge: 'The Pipeline',
+    title: 'Sockets, Connections & Live Shapes',
+    badge: 'Signal Flow',
     content:
-      'Connect layers by dragging wires between handles. Wires are color-coded: 🟢 Green means shapes are mathematically compatible, 🔴 Red flags mismatches with an actionable fix hint, and ⚪ Grey indicates upstream errors.',
-    tip: 'Look at the shape badges on wires (e.g. [B, 8, 28, 28]) to watch data transform as it travels through layers.',
-    icon: <Sparkles size={24} color="#f59e0b" />,
+      'Connect layers by dragging wires between socket handles. Wires are color-coded: Blue/Purple indicates compatible signal flow, Crimson flags dimensional mismatches with actionable fix hints, and Muted Grey indicates uncalculated states.',
+    tip: 'Look at the shape badges on wires (e.g. [B, 28, 28, 1]) to watch data transform as it travels through layers.',
+    icon: <Sparkles size={24} color="#0078d4" />,
   },
   {
     title: 'Self-Documenting Nodes',

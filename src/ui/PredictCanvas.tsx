@@ -13,6 +13,7 @@ import {
 import { useTrainingSafe } from '../backends/tfjs/TrainingContext';
 import { useGraphStore } from '../core/store';
 import { getDatasetMeta } from '../core/datasets';
+import { getAuthenticSample } from '../core/authenticDatasets';
 import { TestSample } from '../backends/tfjs/useTrainingWorker';
 
 interface PredictCanvasProps {
@@ -20,55 +21,6 @@ interface PredictCanvasProps {
 }
 
 type PredictMode = 'draw' | 'upload' | 'samples';
-
-// Sample 28x28 digit prototypes for the [Random] button
-const SAMPLE_DIGITS: Record<number, number[][]> = {
-  0: [
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 1, 1, 1, 1, 0, 0],
-    [0, 1, 0, 0, 1, 0, 0],
-    [0, 1, 0, 0, 1, 0, 0],
-    [0, 1, 0, 0, 1, 0, 0],
-    [0, 1, 1, 1, 1, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-  ],
-  1: [
-    [0, 0, 0, 1, 0, 0, 0],
-    [0, 0, 1, 1, 0, 0, 0],
-    [0, 0, 0, 1, 0, 0, 0],
-    [0, 0, 0, 1, 0, 0, 0],
-    [0, 0, 0, 1, 0, 0, 0],
-    [0, 0, 1, 1, 1, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-  ],
-  3: [
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 1, 1, 1, 1, 0, 0],
-    [0, 0, 0, 0, 1, 0, 0],
-    [0, 0, 1, 1, 1, 0, 0],
-    [0, 0, 0, 0, 1, 0, 0],
-    [0, 1, 1, 1, 1, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-  ],
-  7: [
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 1, 1, 1, 1, 1, 0],
-    [0, 0, 0, 0, 1, 0, 0],
-    [0, 0, 0, 1, 0, 0, 0],
-    [0, 0, 1, 0, 0, 0, 0],
-    [0, 0, 1, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-  ],
-  8: [
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 1, 1, 1, 1, 0, 0],
-    [0, 1, 0, 0, 1, 0, 0],
-    [0, 0, 1, 1, 0, 0, 0],
-    [0, 1, 0, 0, 1, 0, 0],
-    [0, 1, 1, 1, 1, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-  ],
-};
 
 function extractCanvasPixels(canvas: HTMLCanvasElement, targetW = 28, targetH = 28, channels = 1): number[] {
   const tempCanvas = document.createElement('canvas');
@@ -167,26 +119,30 @@ export const PredictCanvas: React.FC<PredictCanvasProps> = () => {
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const d = targetDigit !== undefined ? targetDigit : Math.floor(Math.random() * 10);
+      const seed = Math.floor(Math.random() * 1000);
+      const sample = getAuthenticSample('mnist', d + seed * 10);
 
-      const digits = [0, 1, 3, 7, 8];
-      const d = targetDigit !== undefined ? targetDigit : digits[Math.floor(Math.random() * digits.length)];
-      const proto = SAMPLE_DIGITS[d] || SAMPLE_DIGITS[7];
+      const offscreen = document.createElement('canvas');
+      offscreen.width = 28;
+      offscreen.height = 28;
+      const offCtx = offscreen.getContext('2d');
+      if (!offCtx) return;
 
-      ctx.fillStyle = '#f8fafc';
-      const cellW = canvas.width / 7;
-      const cellH = canvas.height / 7;
-
-      for (let r = 0; r < 7; r++) {
-        for (let c = 0; c < 7; c++) {
-          if (proto[r][c] === 1) {
-            ctx.beginPath();
-            ctx.arc(c * cellW + cellW / 2, r * cellH + cellH / 2, cellW * 0.42, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        }
+      const imgData = offCtx.createImageData(28, 28);
+      for (let i = 0; i < 784; i++) {
+        const v = Math.min(255, Math.max(0, Math.round((sample.pixels[i] ?? 0) * 255)));
+        imgData.data[i * 4 + 0] = v;
+        imgData.data[i * 4 + 1] = v;
+        imgData.data[i * 4 + 2] = v;
+        imgData.data[i * 4 + 3] = 255;
       }
+      offCtx.putImageData(imgData, 0, 0);
+
+      ctx.fillStyle = '#141414';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(offscreen, 0, 0, canvas.width, canvas.height);
 
       triggerRealPrediction(canvas);
     },

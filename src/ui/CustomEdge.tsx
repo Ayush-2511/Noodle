@@ -5,6 +5,7 @@ import {
   EdgeProps,
   getBezierPath,
 } from '@xyflow/react';
+import { AlertCircle, Info } from 'lucide-react';
 import { WireStatus } from '../core/validator';
 
 export interface CustomEdgeData {
@@ -41,42 +42,36 @@ export const CustomEdge: React.FC<EdgeProps> = ({
   };
 
   // Wire styling by data type and validity status:
-  // - dataset: 🔵 Blue (#38bdf8)
-  // - model: 🟣 Purple (#a855f7)
-  // - metrics: 🟠 Orange (#f59e0b)
-  // - tensor / scalar: ⚪ White/Slate (#94a3b8) or Green (#22c55e)
-  // - error: 🔴 Red (#ef4444)
-  // - unknown: ⚪ Muted Grey (#64748b)
-  let strokeColor = '#22c55e'; // green (default valid)
-  let badgeBg = '#14532d';
-  let badgeBorder = '#22c55e';
-  let badgeText = '#86efac';
+  let strokeColor = '#0078d4'; // Fluent blue (default)
+  let badgeBg = '#1e1e1e';
+  let badgeBorder = '#333333';
+  let badgeText = '#cccccc';
 
   if (edgeData.status === 'error') {
-    strokeColor = '#ef4444'; // red
-    badgeBg = '#7f1d1d';
-    badgeBorder = '#ef4444';
-    badgeText = '#fca5a5';
+    strokeColor = '#a80000'; // crimson
+    badgeBg = '#2a1a1a';
+    badgeBorder = '#552222';
+    badgeText = '#ff8888';
   } else if (edgeData.status === 'unknown') {
-    strokeColor = '#64748b'; // grey
-    badgeBg = '#1e293b';
-    badgeBorder = '#475569';
-    badgeText = '#94a3b8';
+    strokeColor = '#555555'; // grey
+    badgeBg = '#181818';
+    badgeBorder = '#2d2d2d';
+    badgeText = '#888888';
   } else if (edgeData.dataType === 'dataset') {
-    strokeColor = '#38bdf8'; // Blue
-    badgeBg = '#0c4a6e';
-    badgeBorder = '#38bdf8';
-    badgeText = '#7dd3fc';
+    strokeColor = '#0078d4'; // Blue
+    badgeBg = '#1e1e1e';
+    badgeBorder = '#005a9e';
+    badgeText = '#80c0ff';
   } else if (edgeData.dataType === 'model') {
-    strokeColor = '#c084fc'; // Purple
-    badgeBg = '#581c87';
-    badgeBorder = '#c084fc';
-    badgeText = '#f3e8ff';
+    strokeColor = '#886ce4'; // Muted violet
+    badgeBg = '#1e1e1e';
+    badgeBorder = '#554488';
+    badgeText = '#d0c4f8';
   } else if (edgeData.dataType === 'metrics') {
-    strokeColor = '#f59e0b'; // Orange
-    badgeBg = '#78350f';
-    badgeBorder = '#f59e0b';
-    badgeText = '#fef3c7';
+    strokeColor = '#107c41'; // Green
+    badgeBg = '#1e1e1e';
+    badgeBorder = '#1c663a';
+    badgeText = '#70d090';
   }
 
   const isError = edgeData.status === 'error';
@@ -124,7 +119,7 @@ export const CustomEdge: React.FC<EdgeProps> = ({
               gap: 4,
             }}
           >
-            {isError && <span>🔴</span>}
+            {isError && <AlertCircle size={11} color="#f48771" />}
             <span>{isError ? 'Shape Mismatch' : edgeData.shape || '[B]'}</span>
           </div>
 
@@ -137,23 +132,24 @@ export const CustomEdge: React.FC<EdgeProps> = ({
                 left: '50%',
                 transform: 'translateX(-50%)',
                 width: 240,
-                backgroundColor: '#1e293b',
-                border: '1px solid #ef4444',
-                borderRadius: 6,
+                backgroundColor: '#252526',
+                border: '1px solid #f48771',
+                borderRadius: 4,
                 padding: '8px 10px',
-                color: '#f8fafc',
+                color: '#cccccc',
                 fontSize: '0.72rem',
-                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)',
+                boxShadow: '0 8px 16px rgba(0, 0, 0, 0.4)',
                 zIndex: 20,
                 pointerEvents: 'none',
               }}
             >
-              <div style={{ fontWeight: 600, color: '#f87171', marginBottom: 4 }}>
+              <div style={{ fontWeight: 600, color: '#f48771', marginBottom: 4 }}>
                 {edgeData.message}
               </div>
               {edgeData.fixHint && (
-                <div style={{ color: '#94a3b8', fontSize: '0.68rem' }}>
-                  💡 {edgeData.fixHint}
+                <div style={{ color: '#888888', fontSize: '0.68rem', display: 'flex', alignItems: 'flex-start', gap: 4 }}>
+                  <Info size={12} color="#0078d4" style={{ flexShrink: 0, marginTop: 1 }} />
+                  <span>{edgeData.fixHint}</span>
                 </div>
               )}
             </div>

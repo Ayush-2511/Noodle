@@ -300,7 +300,7 @@ export const LayerStack: React.FC<LayerStackProps> = ({
                     <span>{shapeInfo.error}</span>
                     {shapeInfo.fixHint && (
                       <div style={{ color: '#fed7aa', marginTop: 2 }}>
-                        💡 {shapeInfo.fixHint}
+                        Hint: {shapeInfo.fixHint}
                       </div>
                     )}
                   </div>

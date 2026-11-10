@@ -31,7 +31,7 @@ export const ImageGalleryView: React.FC<ImageGalleryViewProps> = ({
   // Filter sample indices matching selected class
   const classFilteredIndices = React.useMemo(() => {
     const indices: number[] = [];
-    const limit = Math.min(totalSamples, 2000); // Pool of samples to paginate through
+    const limit = Math.min(totalSamples, 2000);
     for (let i = 0; i < limit; i++) {
       const label = i % classes.length;
       if (selectedClass === 'all' || selectedClass === label) {
@@ -47,41 +47,40 @@ export const ImageGalleryView: React.FC<ImageGalleryViewProps> = ({
   const handlePrevPage = () => setPage((p) => Math.max(0, p - 1));
   const handleNextPage = () => setPage((p) => Math.min(maxPages - 1, p + 1));
 
-  // Reset page when filter changes
   useEffect(() => {
     setPage(0);
   }, [selectedClass]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '12px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '10px' }}>
       {/* Class Filter Bar */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
+          gap: '6px',
           flexWrap: 'wrap',
-          backgroundColor: '#0f172a',
+          backgroundColor: '#1e1e1e',
           padding: '8px 12px',
-          borderRadius: '8px',
-          border: '1px solid #1e293b',
+          borderRadius: '4px',
+          border: '1px solid #2d2d2d',
         }}
       >
-        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>
-          Filter Class:
+        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#888888', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+          Class Filter:
         </span>
         <button
           onClick={() => setSelectedClass('all')}
           style={{
-            padding: '4px 10px',
-            fontSize: '0.72rem',
-            borderRadius: '6px',
-            backgroundColor: selectedClass === 'all' ? '#38bdf8' : '#1e293b',
-            color: selectedClass === 'all' ? '#0f172a' : '#cbd5e1',
-            fontWeight: selectedClass === 'all' ? 700 : 500,
-            border: '1px solid #334155',
+            padding: '3px 9px',
+            fontSize: '0.7rem',
+            borderRadius: '3px',
+            backgroundColor: selectedClass === 'all' ? '#0078d4' : '#252526',
+            color: selectedClass === 'all' ? '#ffffff' : '#cccccc',
+            fontWeight: selectedClass === 'all' ? 600 : 400,
+            border: selectedClass === 'all' ? '1px solid #005a9e' : '1px solid #333333',
             cursor: 'pointer',
-            transition: 'all 0.15s ease',
+            transition: 'background-color 0.1s ease',
           }}
         >
           All Classes ({totalSamples.toLocaleString()})
@@ -94,15 +93,15 @@ export const ImageGalleryView: React.FC<ImageGalleryViewProps> = ({
               key={idx}
               onClick={() => setSelectedClass(idx)}
               style={{
-                padding: '4px 9px',
-                fontSize: '0.72rem',
-                borderRadius: '6px',
-                backgroundColor: isActive ? '#6366f1' : '#1e293b',
-                color: isActive ? '#ffffff' : '#94a3b8',
+                padding: '3px 8px',
+                fontSize: '0.7rem',
+                borderRadius: '3px',
+                backgroundColor: isActive ? '#0078d4' : '#252526',
+                color: isActive ? '#ffffff' : '#a6a6a6',
                 fontWeight: isActive ? 600 : 400,
-                border: isActive ? '1px solid #818cf8' : '1px solid #334155',
+                border: isActive ? '1px solid #005a9e' : '1px solid #333333',
                 cursor: 'pointer',
-                transition: 'all 0.15s ease',
+                transition: 'background-color 0.1s ease',
               }}
             >
               {idx}: {cls}
@@ -117,9 +116,9 @@ export const ImageGalleryView: React.FC<ImageGalleryViewProps> = ({
           flex: 1,
           overflowY: 'auto',
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
-          gap: '12px',
-          paddingRight: '6px',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+          gap: '10px',
+          paddingRight: '4px',
         }}
       >
         {currentIndices.map((sampleIdx) => (
@@ -139,10 +138,10 @@ export const ImageGalleryView: React.FC<ImageGalleryViewProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '8px 12px',
-          backgroundColor: '#0f172a',
-          borderRadius: '8px',
-          border: '1px solid #1e293b',
+          padding: '6px 12px',
+          backgroundColor: '#1e1e1e',
+          borderRadius: '4px',
+          border: '1px solid #2d2d2d',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -153,20 +152,20 @@ export const ImageGalleryView: React.FC<ImageGalleryViewProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '4px',
-              padding: '4px 10px',
-              borderRadius: '6px',
-              backgroundColor: '#1e293b',
-              color: page === 0 ? '#475569' : '#cbd5e1',
-              border: '1px solid #334155',
-              fontSize: '0.75rem',
+              padding: '3px 8px',
+              borderRadius: '3px',
+              backgroundColor: '#252526',
+              color: page === 0 ? '#555555' : '#cccccc',
+              border: '1px solid #333337',
+              fontSize: '0.72rem',
               cursor: page === 0 ? 'not-allowed' : 'pointer',
             }}
           >
-            <ChevronLeft size={14} />
+            <ChevronLeft size={13} />
             Prev
           </button>
-          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-            Page <strong style={{ color: '#f8fafc' }}>{page + 1}</strong> of {maxPages} (
+          <span style={{ fontSize: '0.72rem', color: '#888888' }}>
+            Page <strong style={{ color: '#ffffff' }}>{page + 1}</strong> of {maxPages} (
             {classFilteredIndices.length} filtered items)
           </span>
           <button
@@ -176,42 +175,42 @@ export const ImageGalleryView: React.FC<ImageGalleryViewProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '4px',
-              padding: '4px 10px',
-              borderRadius: '6px',
-              backgroundColor: '#1e293b',
-              color: page >= maxPages - 1 ? '#475569' : '#cbd5e1',
-              border: '1px solid #334155',
-              fontSize: '0.75rem',
+              padding: '3px 8px',
+              borderRadius: '3px',
+              backgroundColor: '#252526',
+              color: page >= maxPages - 1 ? '#555555' : '#cccccc',
+              border: '1px solid #333337',
+              fontSize: '0.72rem',
               cursor: page >= maxPages - 1 ? 'not-allowed' : 'pointer',
             }}
           >
             Next
-            <ChevronRight size={14} />
+            <ChevronRight size={13} />
           </button>
         </div>
 
         {inspectDetail && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '0.75rem' }}>
-            <span style={{ color: '#38bdf8', fontWeight: 600 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.72rem' }}>
+            <span style={{ color: '#0078d4', fontWeight: 600 }}>
               Inspecting #{inspectDetail.index} [{inspectDetail.className}]
             </span>
-            <span style={{ color: '#94a3b8' }}>
-              Shape: <strong>[1, 28, 28]</strong>
+            <span style={{ color: '#888888' }}>
+              Shape: <strong style={{ color: '#cccccc' }}>[1, 28, 28]</strong>
             </span>
-            <span style={{ color: '#94a3b8' }}>
-              Intensity Range: [{inspectDetail.min.toFixed(2)}, {inspectDetail.max.toFixed(2)}]
+            <span style={{ color: '#888888' }}>
+              Range: [{inspectDetail.min.toFixed(2)}, {inspectDetail.max.toFixed(2)}]
             </span>
-            <span style={{ color: '#94a3b8' }}>
-              Mean: <strong>{inspectDetail.mean.toFixed(3)}</strong>
+            <span style={{ color: '#888888' }}>
+              Mean: <strong style={{ color: '#cccccc' }}>{inspectDetail.mean.toFixed(3)}</strong>
             </span>
             <button
               onClick={() => setInspectDetail(null)}
               style={{
                 backgroundColor: 'transparent',
                 border: 'none',
-                color: '#64748b',
+                color: '#666666',
                 cursor: 'pointer',
-                fontSize: '0.8rem',
+                fontSize: '0.75rem',
               }}
             >
               ✕
@@ -251,10 +250,10 @@ const SampleCard: React.FC<SampleCardProps> = ({
     const imgData = ctx.createImageData(28, 28);
     for (let i = 0; i < 784; i++) {
       const val = Math.floor(sample.pixels[i] * 255);
-      imgData.data[i * 4 + 0] = val; // R
-      imgData.data[i * 4 + 1] = val; // G
-      imgData.data[i * 4 + 2] = val; // B
-      imgData.data[i * 4 + 3] = 255; // A
+      imgData.data[i * 4 + 0] = val;
+      imgData.data[i * 4 + 1] = val;
+      imgData.data[i * 4 + 2] = val;
+      imgData.data[i * 4 + 3] = 255;
     }
     ctx.putImageData(imgData, 0, 0);
   }, [sample]);
@@ -289,33 +288,32 @@ const SampleCard: React.FC<SampleCardProps> = ({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        padding: '8px',
-        backgroundColor: isSelected ? '#1e293b' : '#0f172a',
-        borderRadius: '8px',
-        border: isSelected ? '2px solid #38bdf8' : '1px solid #1e293b',
+        padding: '6px',
+        backgroundColor: isSelected ? '#252526' : '#1e1e1e',
+        borderRadius: '3px',
+        border: isSelected ? '1px solid #0078d4' : '1px solid #2d2d2d',
         cursor: 'pointer',
-        transition: 'all 0.15s ease',
-        boxShadow: isSelected ? '0 0 10px rgba(56, 189, 248, 0.3)' : 'none',
+        transition: 'border-color 0.1s ease',
       }}
       onMouseEnter={(e) => {
-        if (!isSelected) e.currentTarget.style.borderColor = '#475569';
+        if (!isSelected) e.currentTarget.style.borderColor = '#444444';
       }}
       onMouseLeave={(e) => {
-        if (!isSelected) e.currentTarget.style.borderColor = '#1e293b';
+        if (!isSelected) e.currentTarget.style.borderColor = '#2d2d2d';
       }}
     >
       <div
         style={{
           width: '100%',
           aspectRatio: '1',
-          backgroundColor: '#000000',
-          borderRadius: '6px',
+          backgroundColor: '#141414',
+          borderRadius: '2px',
           overflow: 'hidden',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          border: '1px solid #334155',
-          marginBottom: '6px',
+          border: '1px solid #282828',
+          marginBottom: '5px',
         }}
       >
         <canvas
@@ -336,18 +334,18 @@ const SampleCard: React.FC<SampleCardProps> = ({
           alignItems: 'center',
           justifyContent: 'space-between',
           width: '100%',
-          fontSize: '0.7rem',
+          fontSize: '0.68rem',
         }}
       >
-        <span style={{ color: '#64748b', fontFamily: 'monospace' }}>#{sampleIndex}</span>
+        <span style={{ color: '#666666', fontFamily: 'Consolas, monospace' }}>#{sampleIndex}</span>
         <span
           style={{
-            backgroundColor: '#1e1b4b',
-            color: '#a5b4fc',
-            padding: '1px 6px',
-            borderRadius: '4px',
-            fontWeight: 600,
-            border: '1px solid #4338ca',
+            backgroundColor: '#252526',
+            color: '#b0b0b0',
+            padding: '1px 5px',
+            borderRadius: '2px',
+            fontWeight: 500,
+            border: '1px solid #333333',
           }}
         >
           {sample.className}

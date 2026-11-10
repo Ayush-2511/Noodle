@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { Editor } from './ui/Editor';
 import { NodePalette } from './ui/NodePalette';
-import { JsonInspector } from './ui/JsonInspector';
+import { InspectorPanel } from './ui/InspectorPanel';
 import { DebugPanel } from './ui/DebugPanel';
 import { TrainingPanel } from './ui/TrainingPanel';
 import { GlossaryPanel } from './ui/GlossaryPanel';
@@ -23,6 +23,7 @@ import {
   Network,
   Database,
   Check,
+  PanelRight,
 } from 'lucide-react';
 
 const MainApp: React.FC = () => {
@@ -30,6 +31,7 @@ const MainApp: React.FC = () => {
   const [isGlossaryOpen, setIsGlossaryOpen] = useState(false);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [isTourOpen, setIsTourOpen] = useState(false);
+  const [isInspectorOpen, setIsInspectorOpen] = useState(true);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const activeTab = useGraphStore((state) => state.activeWorkspaceTab);
@@ -40,7 +42,7 @@ const MainApp: React.FC = () => {
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3500);
+    setTimeout(() => setToastMsg(null), 3000);
   };
 
   const handleSaveProject = useCallback(async () => {
@@ -48,9 +50,9 @@ const MainApp: React.FC = () => {
     const res = await saveNoodleProjectNative(currentGraph, 'pipeline.noodle');
     if (res.success) {
       const fileName = res.filePath ? res.filePath.split(/[\\/]/).pop() : 'pipeline.noodle';
-      showToast(`✓ Project saved: ${fileName}`);
+      showToast(`Saved: ${fileName}`);
     } else if (res.error) {
-      showToast(`Save failed: ${res.error}`);
+      showToast(`Save error: ${res.error}`);
     }
   }, []);
 
@@ -58,9 +60,9 @@ const MainApp: React.FC = () => {
     const res = await openNoodleProjectNative();
     if (res.graph) {
       loadGraph(res.graph);
-      showToast(`✓ Loaded project: ${res.title || 'pipeline.noodle'}`);
+      showToast(`Opened: ${res.title || 'Project'}`);
     } else if (res.error) {
-      showToast(`Open failed: ${res.error}`);
+      showToast(`Open error: ${res.error}`);
     }
   }, [loadGraph]);
 
@@ -82,7 +84,6 @@ const MainApp: React.FC = () => {
   // Global Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger if user is typing in an input or select
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement ||
@@ -119,6 +120,13 @@ const MainApp: React.FC = () => {
         return;
       }
 
+      // Hotkey: Ctrl+B (Toggle inspector)
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
+        e.preventDefault();
+        setIsInspectorOpen((prev) => !prev);
+        return;
+      }
+
       if (e.key === 'd' || e.key === 'D') {
         setIsDebugOpen((prev) => !prev);
       } else if (e.key === 'g' || e.key === 'G') {
@@ -139,89 +147,109 @@ const MainApp: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100vw', height: '100vh', backgroundColor: '#0f172a' }}>
-      {/* Top Application Bar */}
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        width: '100vw',
+        height: '100vh',
+        backgroundColor: '#181818',
+        fontFamily: '"Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif',
+        color: '#e1e1e1',
+      }}
+    >
+      {/* Windows Application Header Bar */}
       <header
         style={{
-          height: '48px',
-          backgroundColor: '#0f172a',
-          borderBottom: '1px solid #1e293b',
+          height: '40px',
+          backgroundColor: '#1e1e1e',
+          borderBottom: '1px solid #2d2d2d',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 16px',
+          padding: '0 12px',
           zIndex: 10,
+          userSelect: 'none',
         }}
       >
-        {/* Left Section: Branding & Native File Menu */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '1.25rem' }}>🍜</span>
-            <span style={{ fontWeight: 700, fontSize: '0.95rem', letterSpacing: '0.02em', color: '#f8fafc' }}>
-              Noodle
+        {/* Left: Branding & Windows App Menu */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          {/* Logo Glyph */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0078d4" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="6" cy="6" r="3" />
+              <circle cx="6" cy="18" r="3" />
+              <circle cx="18" cy="12" r="3" />
+              <line x1="9" y1="6" x2="15" y2="10" />
+              <line x1="9" y1="18" x2="15" y2="14" />
+            </svg>
+            <span style={{ fontWeight: 700, fontSize: '0.86rem', letterSpacing: '0.04em', color: '#ffffff' }}>
+              NOODLE
             </span>
-            <span
-              style={{
-                fontSize: '0.65rem',
-                backgroundColor: '#1e293b',
-                color: '#38bdf8',
-                padding: '2px 6px',
-                borderRadius: '4px',
-                fontWeight: 600,
-                border: '1px solid #0284c7',
-              }}
-            >
-              Desktop
+            <span style={{ fontSize: '0.68rem', color: '#777777', fontWeight: 500 }}>
+              Studio
             </span>
           </div>
 
-          <div style={{ width: '1px', height: '20px', backgroundColor: '#1e293b' }} />
+          <div style={{ width: '1px', height: '18px', backgroundColor: '#333333' }} />
 
-          {/* Project File Operations (.noodle) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {/* Standard Desktop Actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <button
               onClick={handleOpenProject}
-              title="Open .noodle Project (Ctrl+O)"
+              title="Open Project File (Ctrl+O)"
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '5px',
-                padding: '4px 9px',
-                backgroundColor: '#1e293b',
-                border: '1px solid #334155',
-                borderRadius: '6px',
-                color: '#cbd5e1',
+                gap: 5,
+                padding: '4px 8px',
+                backgroundColor: 'transparent',
+                border: '1px solid transparent',
+                borderRadius: 3,
+                color: '#cccccc',
                 fontSize: '0.74rem',
                 cursor: 'pointer',
-                transition: 'all 0.15s ease',
+                transition: 'background-color 0.1s ease',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#334155')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1e293b')}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#2a2d2e';
+                e.currentTarget.style.borderColor = '#383838';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.borderColor = 'transparent';
+              }}
             >
-              <FolderOpen size={13} color="#38bdf8" />
+              <FolderOpen size={13} color="#a6a6a6" />
               <span>Open</span>
             </button>
 
             <button
               onClick={handleSaveProject}
-              title="Save .noodle Project (Ctrl+S)"
+              title="Save Project File (Ctrl+S)"
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '5px',
-                padding: '4px 9px',
-                backgroundColor: '#1e293b',
-                border: '1px solid #334155',
-                borderRadius: '6px',
-                color: '#cbd5e1',
+                gap: 5,
+                padding: '4px 8px',
+                backgroundColor: 'transparent',
+                border: '1px solid transparent',
+                borderRadius: 3,
+                color: '#cccccc',
                 fontSize: '0.74rem',
                 cursor: 'pointer',
-                transition: 'all 0.15s ease',
+                transition: 'background-color 0.1s ease',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#334155')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1e293b')}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#2a2d2e';
+                e.currentTarget.style.borderColor = '#383838';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.borderColor = 'transparent';
+              }}
             >
-              <Save size={13} color="#34d399" />
+              <Save size={13} color="#a6a6a6" />
               <span>Save</span>
             </button>
 
@@ -230,33 +258,34 @@ const MainApp: React.FC = () => {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '4px',
-                  backgroundColor: '#064e3b',
-                  color: '#6ee7b7',
-                  border: '1px solid #059669',
+                  gap: 4,
+                  backgroundColor: '#1b2d1f',
+                  color: '#4ade80',
+                  border: '1px solid #276235',
                   padding: '2px 8px',
-                  borderRadius: '4px',
-                  fontSize: '0.7rem',
+                  borderRadius: 3,
+                  fontSize: '0.68rem',
                   fontWeight: 500,
+                  marginLeft: 4,
                 }}
               >
-                <Check size={12} />
+                <Check size={11} />
                 <span>{toastMsg}</span>
               </div>
             )}
           </div>
         </div>
 
-        {/* Center Section: In-App Workspace Tab Switcher */}
+        {/* Center: Windows Segmented Workspace Switcher */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            backgroundColor: '#020617',
-            padding: '3px',
-            borderRadius: '8px',
-            border: '1px solid #1e293b',
-            gap: '3px',
+            backgroundColor: '#141414',
+            padding: '2px',
+            borderRadius: 4,
+            border: '1px solid #2d2d2d',
+            gap: 2,
           }}
         >
           <button
@@ -264,21 +293,21 @@ const MainApp: React.FC = () => {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '4px 14px',
-              borderRadius: '6px',
-              backgroundColor: activeTab === 'canvas' ? '#1e293b' : 'transparent',
-              color: activeTab === 'canvas' ? '#38bdf8' : '#94a3b8',
-              fontWeight: activeTab === 'canvas' ? 600 : 500,
-              border: activeTab === 'canvas' ? '1px solid #0284c7' : '1px solid transparent',
-              fontSize: '0.78rem',
+              gap: 6,
+              padding: '3px 12px',
+              borderRadius: 3,
+              backgroundColor: activeTab === 'canvas' ? '#252526' : 'transparent',
+              color: activeTab === 'canvas' ? '#ffffff' : '#888888',
+              fontWeight: activeTab === 'canvas' ? 600 : 400,
+              border: activeTab === 'canvas' ? '1px solid #383838' : '1px solid transparent',
+              fontSize: '0.74rem',
               cursor: 'pointer',
-              transition: 'all 0.15s ease',
+              transition: 'all 0.1s ease',
             }}
           >
-            <Network size={14} color={activeTab === 'canvas' ? '#38bdf8' : '#64748b'} />
+            <Network size={12} color={activeTab === 'canvas' ? '#0078d4' : '#666666'} />
             <span>Network Canvas</span>
-            <span style={{ fontSize: '0.62rem', opacity: 0.6, marginLeft: '2px' }}>Ctrl+1</span>
+            <span style={{ fontSize: '0.62rem', color: '#666666', marginLeft: 2 }}>Ctrl+1</span>
           </button>
 
           <button
@@ -286,117 +315,126 @@ const MainApp: React.FC = () => {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '4px 14px',
-              borderRadius: '6px',
-              backgroundColor: activeTab === 'dataset' ? '#1e293b' : 'transparent',
-              color: activeTab === 'dataset' ? '#a855f7' : '#94a3b8',
-              fontWeight: activeTab === 'dataset' ? 600 : 500,
-              border: activeTab === 'dataset' ? '1px solid #9333ea' : '1px solid transparent',
-              fontSize: '0.78rem',
+              gap: 6,
+              padding: '3px 12px',
+              borderRadius: 3,
+              backgroundColor: activeTab === 'dataset' ? '#252526' : 'transparent',
+              color: activeTab === 'dataset' ? '#ffffff' : '#888888',
+              fontWeight: activeTab === 'dataset' ? 600 : 400,
+              border: activeTab === 'dataset' ? '1px solid #383838' : '1px solid transparent',
+              fontSize: '0.74rem',
               cursor: 'pointer',
-              transition: 'all 0.15s ease',
+              transition: 'all 0.1s ease',
             }}
           >
-            <Database size={14} color={activeTab === 'dataset' ? '#c084fc' : '#64748b'} />
+            <Database size={12} color={activeTab === 'dataset' ? '#0078d4' : '#666666'} />
             <span>Dataset Inspector</span>
-            <span style={{ fontSize: '0.62rem', opacity: 0.6, marginLeft: '2px' }}>Ctrl+2</span>
+            <span style={{ fontSize: '0.62rem', color: '#666666', marginLeft: 2 }}>Ctrl+2</span>
           </button>
         </div>
 
-        {/* Right Section: Tools, Help & Diagnostics */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {/* Templates & Guided Labs Gallery */}
+        {/* Right: Studio Tools & Controls */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {/* Templates Gallery */}
           <button
             onClick={() => setIsGalleryOpen(true)}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '5px 12px',
-              backgroundColor: '#1e1b4b',
-              border: '1px solid #6366f1',
-              borderRadius: '6px',
-              color: '#c7d2fe',
-              fontSize: '0.76rem',
-              fontWeight: 600,
+              gap: 5,
+              padding: '4px 9px',
+              backgroundColor: '#252526',
+              border: '1px solid #383838',
+              borderRadius: 3,
+              color: '#d4d4d4',
+              fontSize: '0.72rem',
+              fontWeight: 500,
               cursor: 'pointer',
-              transition: 'all 0.15s ease',
+              transition: 'background-color 0.1s ease',
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#312e81';
-              e.currentTarget.style.borderColor = '#818cf8';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#1e1b4b';
-              e.currentTarget.style.borderColor = '#6366f1';
-            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#2d2d30')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#252526')}
           >
-            <Sparkles size={14} color="#818cf8" />
+            <Sparkles size={12} color="#0078d4" />
             <span>Templates (T)</span>
           </button>
 
-          {/* Field Guide */}
+          {/* Neural Network Field Guide */}
           <button
             onClick={() => setIsGlossaryOpen((prev) => !prev)}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '5px',
-              padding: '5px 10px',
-              backgroundColor: isGlossaryOpen ? '#082f49' : '#1e293b',
-              border: isGlossaryOpen ? '1px solid #38bdf8' : '1px solid #334155',
-              borderRadius: '6px',
-              color: isGlossaryOpen ? '#38bdf8' : '#cbd5e1',
-              fontSize: '0.75rem',
+              gap: 5,
+              padding: '4px 9px',
+              backgroundColor: isGlossaryOpen ? '#2a2d2e' : '#252526',
+              border: isGlossaryOpen ? '1px solid #0078d4' : '1px solid #383838',
+              borderRadius: 3,
+              color: isGlossaryOpen ? '#ffffff' : '#d4d4d4',
+              fontSize: '0.72rem',
               cursor: 'pointer',
-              transition: 'all 0.15s ease',
             }}
           >
-            <BookOpen size={13} color="#38bdf8" />
+            <BookOpen size={12} color={isGlossaryOpen ? '#0078d4' : '#999999'} />
             <span>Guide (G)</span>
           </button>
 
-          {/* Tour */}
+          {/* Quick Tour */}
           <button
             onClick={() => setIsTourOpen(true)}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '5px',
-              padding: '5px 9px',
-              backgroundColor: '#1e293b',
-              border: '1px solid #334155',
-              borderRadius: '6px',
-              color: '#cbd5e1',
-              fontSize: '0.75rem',
+              gap: 5,
+              padding: '4px 8px',
+              backgroundColor: '#252526',
+              border: '1px solid #383838',
+              borderRadius: 3,
+              color: '#cccccc',
+              fontSize: '0.72rem',
               cursor: 'pointer',
-              transition: 'all 0.15s ease',
             }}
           >
-            <HelpCircle size={13} color="#34d399" />
+            <HelpCircle size={12} color="#999999" />
             <span>Tour (?)</span>
+          </button>
+
+          {/* Toggle Inspector Panel */}
+          <button
+            onClick={() => setIsInspectorOpen((prev) => !prev)}
+            title="Toggle Properties Inspector (Ctrl+B)"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              padding: '4px 7px',
+              backgroundColor: isInspectorOpen ? '#2a2d2e' : '#252526',
+              border: isInspectorOpen ? '1px solid #0078d4' : '1px solid #383838',
+              borderRadius: 3,
+              color: isInspectorOpen ? '#0078d4' : '#999999',
+              fontSize: '0.72rem',
+              cursor: 'pointer',
+            }}
+          >
+            <PanelRight size={13} />
           </button>
 
           {/* Debug Panel Toggle */}
           <button
             onClick={() => setIsDebugOpen((prev) => !prev)}
+            title="Debug Diagnostics (D)"
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '5px',
-              padding: '5px 10px',
-              backgroundColor: isDebugOpen ? '#334155' : '#1e293b',
-              border: isDebugOpen ? '1px solid #38bdf8' : '1px solid #334155',
-              borderRadius: '6px',
-              color: isDebugOpen ? '#38bdf8' : '#cbd5e1',
-              fontSize: '0.75rem',
+              padding: '4px 7px',
+              backgroundColor: isDebugOpen ? '#2a2d2e' : '#252526',
+              border: isDebugOpen ? '1px solid #0078d4' : '1px solid #383838',
+              borderRadius: 3,
+              color: isDebugOpen ? '#0078d4' : '#999999',
+              fontSize: '0.72rem',
               cursor: 'pointer',
-              transition: 'all 0.15s ease',
             }}
           >
             <Bug size={13} />
-            <span>Debug (D)</span>
           </button>
 
           {/* Clear Canvas */}
@@ -406,46 +444,44 @@ const MainApp: React.FC = () => {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '4px',
-              padding: '5px 8px',
-              backgroundColor: '#1e293b',
-              border: '1px solid #334155',
-              borderRadius: '6px',
-              color: '#94a3b8',
-              fontSize: '0.75rem',
+              padding: '4px 7px',
+              backgroundColor: '#252526',
+              border: '1px solid #383838',
+              borderRadius: 3,
+              color: '#888888',
+              fontSize: '0.72rem',
               cursor: 'pointer',
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = '#94a3b8')}
+            onMouseEnter={(e) => (e.currentTarget.style.color = '#ff6b6b')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = '#888888')}
           >
-            <RotateCcw size={13} />
-            <span>Clear</span>
+            <RotateCcw size={12} />
           </button>
         </div>
       </header>
 
-      {/* Main Workspace Layout: Switches between Canvas & Dataset Inspector */}
+      {/* Main Studio Workspace: Switches between Canvas & Dataset Inspector */}
       <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden' }}>
         {activeTab === 'canvas' ? (
           <>
             <NodePalette />
-            <main style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+            <main style={{ flex: 1, position: 'relative', overflow: 'hidden', backgroundColor: '#141414' }}>
               <ReactFlowProvider>
                 <Editor />
               </ReactFlowProvider>
               <DebugPanel isOpen={isDebugOpen} onClose={() => setIsDebugOpen(false)} />
             </main>
-            <JsonInspector />
+            {isInspectorOpen && <InspectorPanel />}
           </>
         ) : (
           <DatasetInspector onReturnToCanvas={() => setActiveTab('canvas')} />
         )}
       </div>
 
-      {/* Live Training Sanity Panel (Active during Canvas mode) */}
-      {activeTab === 'canvas' && <TrainingPanel training={training} />}
+      {/* Professional Windows Desktop Status Bar */}
+      <TrainingPanel training={training} />
 
-      {/* Modals & Panels */}
+      {/* Guided Labs & Modals */}
       <GlossaryPanel isOpen={isGlossaryOpen} onClose={() => setIsGlossaryOpen(false)} />
       <TemplateGalleryModal
         isOpen={isGalleryOpen}

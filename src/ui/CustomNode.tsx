@@ -49,25 +49,16 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
     [id, removeNode]
   );
 
-  // Status dot & border color determination
+  // Status color determination (clean vector dot, no emojis)
   const status = nodeData.status || 'ok';
-  let statusDot = '🟢';
-  let borderColor = '#334155';
-  let glowShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.3)';
-
+  let statusColor = '#107c41'; // Windows Green
   if (status === 'error') {
-    statusDot = '🔴';
-    borderColor = '#ef4444';
+    statusColor = '#a80000'; // Windows Red
   } else if (status === 'warning') {
-    statusDot = '🟡';
-    borderColor = '#eab308';
+    statusColor = '#d83b01'; // Windows Amber
   }
 
-  // Active / Selected state visual priority
-  if (selected) {
-    borderColor = '#38bdf8'; // Bright Cyan
-    glowShadow = '0 0 0 3px rgba(56, 189, 248, 0.45), 0 10px 25px -3px rgba(0, 0, 0, 0.6)';
-  }
+  const isSelected = !!selected;
 
   // Primary output shape
   const outShape = nodeData.outputShapes?.['out'] || nodeData.outputShapes?.['images'] || nodeData.outputShapes?.['data'] || 'unknown';
@@ -75,21 +66,23 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
   const paramCount = nodeData.paramCount || 0;
 
   const isBuilder = nodeData.type === 'FeatureExtractor' || nodeData.type === 'Classifier';
-  const nodeWidth = isBuilder ? 340 : nodeData.type === 'Predict' ? 340 : (nodeData.type === 'LoadDataset' || nodeData.type === 'TrainTestSplit') ? 250 : 230;
+  const nodeWidth = isBuilder ? 330 : nodeData.type === 'Predict' ? 330 : (nodeData.type === 'LoadDataset' || nodeData.type === 'TrainTestSplit') ? 240 : 220;
 
   return (
     <div
       style={{
         width: nodeWidth,
-        backgroundColor: '#1e293b',
-        borderRadius: 8,
-        border: `2px solid ${borderColor}`,
-        boxShadow: glowShadow,
-        color: '#f8fafc',
-        fontSize: '0.8rem',
-        overflow: 'visible', // Ensure handles and glow rings are fully visible
+        backgroundColor: '#252526',
+        borderRadius: 4,
+        border: isSelected ? '1px solid #0078d4' : '1px solid #383838',
+        boxShadow: isSelected
+          ? '0 0 0 1px #0078d4, 0 8px 24px rgba(0, 0, 0, 0.55)'
+          : '0 2px 8px rgba(0, 0, 0, 0.4)',
+        color: '#f3f3f3',
+        fontSize: '0.78rem',
+        overflow: 'visible',
         position: 'relative',
-        transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+        transition: 'border-color 0.12s ease, box-shadow 0.12s ease',
       }}
     >
       {/* Node Header */}
@@ -98,27 +91,35 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '7px 12px',
-          backgroundColor: selected ? '#1e293b' : '#0f172a',
-          borderTopLeftRadius: 6,
-          borderTopRightRadius: 6,
-          borderBottom: selected ? '1px solid #38bdf8' : '1px solid #334155',
-          transition: 'background-color 0.15s ease',
+          padding: '6px 10px',
+          backgroundColor: '#2d2d30',
+          borderTopLeftRadius: 3,
+          borderTopRightRadius: 3,
+          borderBottom: '1px solid #1e1e1e',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: '0.7rem' }}>{statusDot}</span>
-          <span style={{ fontWeight: 600, color: selected ? '#38bdf8' : '#f1f5f9' }}>
+          <span
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: '50%',
+              backgroundColor: statusColor,
+              display: 'inline-block',
+            }}
+          />
+          <span style={{ fontWeight: 600, color: isSelected ? '#ffffff' : '#e1e1e1' }}>
             {def.label}
           </span>
           <span
             style={{
-              fontSize: '0.65rem',
-              backgroundColor: '#334155',
-              padding: '1px 5px',
-              borderRadius: 4,
-              color: '#94a3b8',
-              fontFamily: 'monospace',
+              fontSize: '0.62rem',
+              backgroundColor: '#1e1e1e',
+              border: '1px solid #333333',
+              padding: '1px 4px',
+              borderRadius: 3,
+              color: '#888888',
+              fontFamily: 'Consolas, monospace',
             }}
           >
             {id}
@@ -185,8 +186,8 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
             color: '#cbd5e1',
           }}
         >
-          <div style={{ fontWeight: 600, color: '#38bdf8', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span>💡</span>
+          <div style={{ fontWeight: 600, color: '#0078d4', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Info size={12} color="#0078d4" style={{ flexShrink: 0 }} />
             <span>{def.summary || def.label}</span>
           </div>
           <div style={{ color: '#94a3b8' }}>
@@ -248,19 +249,20 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
           </div>
         ))}
 
-        {/* LoadDataset Visual Preview */}
+        {/* LoadDataset Professional Data Card */}
         {nodeData.type === 'LoadDataset' && (
-          <div style={{ marginTop: 6, padding: '6px 8px', backgroundColor: '#0f172a', borderRadius: 4, border: '1px solid #334155' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, marginBottom: 6 }}>
-              {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
-                <div key={num} style={{ aspectRatio: '1', backgroundColor: '#1e293b', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '0.75rem', fontFamily: 'monospace' }}>
-                  {num}
-                </div>
-              ))}
+          <div style={{ marginTop: 6, padding: '8px 10px', backgroundColor: '#181818', borderRadius: 3, border: '1px solid #2d2d2d' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <span style={{ fontSize: '0.72rem', color: '#f3f3f3', fontWeight: 600 }}>
+                {String(nodeData.params.dataset || 'mnist').toUpperCase()}
+              </span>
+              <span style={{ fontSize: '0.62rem', color: '#888888', backgroundColor: '#252526', padding: '1px 5px', borderRadius: 2, border: '1px solid #333333' }}>
+                Vision Benchmark
+              </span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#94a3b8', marginBottom: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#888888', marginBottom: 8 }}>
               <span>60,000 samples</span>
-              <span>28×28 grayscale</span>
+              <span style={{ fontFamily: 'Consolas, monospace' }}>28×28×1</span>
             </div>
             <button
               onClick={(e) => {
@@ -270,23 +272,23 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
               style={{
                 width: '100%',
                 padding: '4px 8px',
-                backgroundColor: '#1e293b',
-                color: '#38bdf8',
-                border: '1px solid #0284c7',
-                borderRadius: 4,
-                fontSize: '0.72rem',
+                backgroundColor: '#252526',
+                color: '#0078d4',
+                border: '1px solid #333337',
+                borderRadius: 3,
+                fontSize: '0.7rem',
                 fontWeight: 600,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 5,
-                transition: 'background-color 0.15s ease',
+                transition: 'background-color 0.12s ease',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#0369a1')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1e293b')}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#2d2d30')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#252526')}
             >
-              <span>📊 Open Dataset Inspector</span>
+              <span>Inspect Dataset (Ctrl+2)</span>
             </button>
           </div>
         )}
@@ -732,7 +734,7 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
                   gap: 4,
                 }}
               >
-                <span style={{ fontWeight: 700, flexShrink: 0 }}>💡 Fix:</span>
+                <span style={{ fontWeight: 600, flexShrink: 0, color: '#0078d4' }}>Hint:</span>
                 <span>{nodeData.fixHint}</span>
               </div>
             )}

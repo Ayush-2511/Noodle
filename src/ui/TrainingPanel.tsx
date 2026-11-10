@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Square, Activity, Cpu, CheckCircle2, AlertOctagon } from 'lucide-react';
+import { Play, Square, Cpu, ShieldCheck } from 'lucide-react';
 import { TrainingWorkerState } from '../backends/tfjs/useTrainingWorker';
 import { useTrainingSafe } from '../backends/tfjs/TrainingContext';
 import { useGraphStore } from '../core/store';
@@ -20,51 +20,48 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ training: propTrai
 
   const handleStart = () => {
     if (!isGraphValid) return;
-    training.startTraining(graph, { epochs: 3, batchSize: 32 });
+    training.startTraining(graph, { epochs: 5, batchSize: 32 });
   };
 
   const lossFormatted = training.latestLoss !== null ? training.latestLoss.toFixed(4) : '--';
   const accFormatted =
     training.latestAccuracy !== null ? `${(training.latestAccuracy * 100).toFixed(1)}%` : '--';
 
-  // Sanity check signals (Section 9.6)
-  const isHealthyLoss = training.latestLoss !== null && training.latestLoss < 3.0;
-  const isHealthyAcc = training.latestAccuracy !== null && training.latestAccuracy > 0.85;
-
   return (
-    <div
+    <footer
       style={{
-        height: '42px',
-        backgroundColor: '#090d16',
-        borderTop: '1px solid #1e293b',
+        height: '28px',
+        backgroundColor: '#1b1b1b',
+        borderTop: '1px solid #2d2d2d',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 16px',
-        fontSize: '0.75rem',
+        padding: '0 12px',
+        fontSize: '0.72rem',
         zIndex: 10,
-        fontFamily: 'monospace',
+        userSelect: 'none',
       }}
     >
-      {/* Left: Actions & Status */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      {/* Left: Execution Controls & Status */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         {training.status === 'training' ? (
           <button
             onClick={training.stopTraining}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 5,
-              padding: '4px 10px',
-              backgroundColor: '#ef4444',
+              gap: 4,
+              padding: '2px 8px',
+              backgroundColor: '#a80000',
               border: 'none',
-              borderRadius: 4,
+              borderRadius: 3,
               color: '#ffffff',
+              fontSize: '0.7rem',
               fontWeight: 600,
               cursor: 'pointer',
             }}
           >
-            <Square size={12} fill="#ffffff" />
+            <Square size={10} fill="#ffffff" />
             <span>Stop Training</span>
           </button>
         ) : (
@@ -74,86 +71,75 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ training: propTrai
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 5,
-              padding: '4px 12px',
-              backgroundColor: isGraphValid ? '#22c55e' : '#334155',
+              gap: 4,
+              padding: '2px 8px',
+              backgroundColor: isGraphValid ? '#107c41' : '#2b2b2b',
               border: 'none',
-              borderRadius: 4,
-              color: isGraphValid ? '#052e16' : '#94a3b8',
+              borderRadius: 3,
+              color: isGraphValid ? '#ffffff' : '#666666',
+              fontSize: '0.7rem',
               fontWeight: 600,
               cursor: isGraphValid ? 'pointer' : 'not-allowed',
             }}
           >
-            <Play size={12} fill={isGraphValid ? '#052e16' : '#94a3b8'} />
-            <span>Train in Web Worker (M4)</span>
+            <Play size={10} fill={isGraphValid ? '#ffffff' : '#666666'} />
+            <span>Run Training</span>
           </button>
         )}
 
-        {/* Progress or status */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#94a3b8' }}>
-          <Activity size={13} color="#38bdf8" />
+        {/* Engine status indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#999999' }}>
+          <span
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: '50%',
+              backgroundColor:
+                training.status === 'training'
+                  ? '#0078d4'
+                  : training.status === 'completed'
+                  ? '#107c41'
+                  : training.status === 'error'
+                  ? '#ff4d4f'
+                  : '#555555',
+            }}
+          />
           <span>
-            Status:{' '}
-            <strong
-              style={{
-                color:
-                  training.status === 'training'
-                    ? '#38bdf8'
-                    : training.status === 'completed'
-                    ? '#22c55e'
-                    : training.status === 'error'
-                    ? '#ef4444'
-                    : '#cbd5e1',
-              }}
-            >
-              {training.status === 'training'
-                ? `Epoch ${training.currentEpoch}/${training.totalEpochs}`
-                : training.status.toUpperCase()}
-            </strong>
+            {training.status === 'training'
+              ? `Training (Epoch ${training.currentEpoch}/${training.totalEpochs})`
+              : training.status === 'completed'
+              ? 'Training Completed'
+              : training.status === 'error'
+              ? 'Training Error'
+              : 'Engine Ready'}
           </span>
         </div>
       </div>
 
-      {/* Center: Live Training Sanity Metrics (Section 9.6) */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ color: '#64748b' }}>Loss:</span>
-          <span style={{ color: isHealthyLoss ? '#4ade80' : '#f8fafc', fontWeight: 600 }}>
-            {lossFormatted}
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ color: '#64748b' }}>Accuracy:</span>
-          <span style={{ color: isHealthyAcc ? '#4ade80' : '#f8fafc', fontWeight: 600 }}>
-            {accFormatted}
-          </span>
-        </div>
-
-        {/* Tensor Memory Leak Monitor (Section 10, Trap 4) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Cpu size={13} color="#94a3b8" />
-          <span style={{ color: '#64748b' }}>Tensors:</span>
-          <span style={{ color: '#cbd5e1' }}>{training.numTensors}</span>
-        </div>
+      {/* Center: Live Training Telemetry */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, color: '#888888' }}>
+        <span>
+          Loss: <strong style={{ color: '#ffffff', fontFamily: 'Consolas, monospace' }}>{lossFormatted}</strong>
+        </span>
+        <span>
+          Accuracy: <strong style={{ color: '#4ade80', fontFamily: 'Consolas, monospace' }}>{accFormatted}</strong>
+        </span>
+        <span>
+          Tensors: <strong style={{ color: '#cccccc', fontFamily: 'Consolas, monospace' }}>{training.numTensors}</strong>
+        </span>
       </div>
 
-      {/* Right: Health Badge */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        {training.status === 'completed' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#22c55e' }}>
-            <CheckCircle2 size={13} />
-            <span>Trained &gt; 90% Acc</span>
-          </div>
-        )}
-        {training.status === 'error' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#ef4444' }}>
-            <AlertOctagon size={13} />
-            <span>{training.errorMessage || 'Training Failed'}</span>
-          </div>
-        )}
+      {/* Right: Environment & Security Status */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, color: '#666666', fontSize: '0.68rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <Cpu size={12} color="#0078d4" />
+          <span>TensorFlow.js (WebGL)</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <ShieldCheck size={12} color="#107c41" />
+          <span>Local On-Device</span>
+        </div>
       </div>
-    </div>
+    </footer>
   );
 };
-
