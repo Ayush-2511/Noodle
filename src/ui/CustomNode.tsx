@@ -75,7 +75,7 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
   const paramCount = nodeData.paramCount || 0;
 
   const isBuilder = nodeData.type === 'FeatureExtractor' || nodeData.type === 'Classifier';
-  const nodeWidth = isBuilder ? 340 : nodeData.type === 'Predict' ? 310 : (nodeData.type === 'LoadDataset' || nodeData.type === 'TrainTestSplit') ? 250 : 230;
+  const nodeWidth = isBuilder ? 340 : nodeData.type === 'Predict' ? 340 : (nodeData.type === 'LoadDataset' || nodeData.type === 'TrainTestSplit') ? 250 : 230;
 
   return (
     <div

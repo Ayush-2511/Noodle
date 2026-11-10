@@ -25,6 +25,12 @@ export interface PredictionResult {
   topClass: number;
 }
 
+export interface TestSample {
+  index: number;
+  trueClass: number;
+  pixels: number[];
+}
+
 export interface TrainingWorkerState {
   status: TrainingStatus;
   currentEpoch: number;
@@ -46,6 +52,7 @@ export interface TrainingWorkerState {
   predictResult: PredictionResult | null;
   isPredicting: boolean;
   runPrediction: (inputData: number[], shape?: number[], graph?: Graph) => Promise<PredictionResult>;
+  getTestSamples: () => Promise<TestSample[]>;
 }
 
 export function useTrainingWorker(): TrainingWorkerState {
@@ -64,6 +71,7 @@ export function useTrainingWorker(): TrainingWorkerState {
   const workerRef = useRef<Worker | null>(null);
   const pendingEvaluations = useRef<Map<string, { resolve: (val: EvaluationResult) => void; reject: (err: any) => void }>>(new Map());
   const pendingPredictions = useRef<Map<string, { resolve: (val: PredictionResult) => void; reject: (err: any) => void }>>(new Map());
+  const pendingTestSamples = useRef<Map<string, { resolve: (val: TestSample[]) => void; reject: (err: any) => void }>>(new Map());
 
   // Initialize Worker using Vite's standard module worker constructor
   useEffect(() => {
@@ -176,6 +184,22 @@ export function useTrainingWorker(): TrainingWorkerState {
             }
             break;
           }
+
+          case 'TEST_SAMPLES_COMPLETED': {
+            if (msg.id && pendingTestSamples.current.has(msg.id)) {
+              pendingTestSamples.current.get(msg.id)!.resolve(msg.samples || []);
+              pendingTestSamples.current.delete(msg.id);
+            }
+            break;
+          }
+
+          case 'TEST_SAMPLES_ERROR': {
+            if (msg.id && pendingTestSamples.current.has(msg.id)) {
+              pendingTestSamples.current.get(msg.id)!.reject(new Error(msg.error));
+              pendingTestSamples.current.delete(msg.id);
+            }
+            break;
+          }
         }
       };
 
@@ -259,6 +283,21 @@ export function useTrainingWorker(): TrainingWorkerState {
     });
   }, []);
 
+  const getTestSamples = useCallback((): Promise<TestSample[]> => {
+    return new Promise((resolve, reject) => {
+      if (!workerRef.current) {
+        reject(new Error('Web Worker not initialized'));
+        return;
+      }
+      const id = `samples_${Date.now()}_${Math.random()}`;
+      pendingTestSamples.current.set(id, { resolve, reject });
+      workerRef.current.postMessage({
+        type: 'GET_TEST_SAMPLES',
+        id,
+      });
+    });
+  }, []);
+
   return {
     status,
     currentEpoch,
@@ -277,6 +316,7 @@ export function useTrainingWorker(): TrainingWorkerState {
     predictResult: null,
     isPredicting: false,
     runPrediction,
+    getTestSamples,
   };
 }
 

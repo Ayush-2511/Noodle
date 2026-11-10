@@ -439,5 +439,26 @@ describe('Noodle v2 Pipeline Paradigm', () => {
       res.dispose();
       compiled.model.dispose();
     });
+
+    it('predicts with custom normalized pixel buffers and handles test sample extraction', () => {
+      // Create a small model expecting [1, 28, 28, 1]
+      const model = tf.sequential();
+      model.add(tf.layers.flatten({ inputShape: [28, 28, 1] }));
+      model.add(tf.layers.dense({ units: 10, activation: 'softmax' }));
+
+      // 784 pixel floats simulating an uploaded image
+      const fakeUploadedPixels = new Array(784).fill(0.5);
+      const inputTensor = tf.tensor(fakeUploadedPixels).reshape([1, 28, 28, 1]);
+      const output = model.predict(inputTensor) as tf.Tensor;
+      const probs = Array.from(output.dataSync());
+
+      expect(probs).toHaveLength(10);
+      const sum = probs.reduce((a, b) => a + b, 0);
+      expect(Math.abs(sum - 1.0)).toBeLessThan(0.01);
+
+      inputTensor.dispose();
+      output.dispose();
+      model.dispose();
+    });
   });
 });

@@ -44,11 +44,17 @@ export interface RunPredictionMessage {
   graph?: Graph;
 }
 
+export interface GetTestSamplesMessage {
+  type: 'GET_TEST_SAMPLES';
+  id?: string;
+}
+
 export type TrainingInMessage =
   | StartTrainingMessage
   | StopTrainingMessage
   | RunEvaluationMessage
-  | RunPredictionMessage;
+  | RunPredictionMessage
+  | GetTestSamplesMessage;
 
 let activeModel: tf.LayersModel | null = null;
 let activeTestData: { testImages: tf.Tensor; testLabels: tf.Tensor } | null = null;
@@ -158,13 +164,27 @@ self.onmessage = async (e: MessageEvent<TrainingInMessage>) => {
         throw new Error('No active model available for prediction');
       }
 
-      const expectedShape = model.inputs[0]?.shape;
-      const isFlattened = expectedShape && expectedShape.length === 2 && expectedShape[1] === 784;
+      const expectedShape = model.inputs[0]?.shape; // e.g. [null, 784] or [null, 28, 28, 1] or [null, 32, 32, 3]
 
       const inputTensor = tf.tidy(() => {
         const raw = tf.tensor(msg.inputData);
-        if (isFlattened) {
-          return raw.reshape([1, 784]);
+        if (expectedShape && expectedShape.length === 2) {
+          const featCount = expectedShape[1] || msg.inputData.length;
+          if (msg.inputData.length !== featCount) {
+            const slice = msg.inputData.slice(0, featCount);
+            while (slice.length < featCount) slice.push(0);
+            return tf.tensor(slice).reshape([1, featCount]);
+          }
+          return raw.reshape([1, featCount]);
+        }
+        if (expectedShape && expectedShape.length === 4) {
+          const h = expectedShape[1] || 28;
+          const w = expectedShape[2] || 28;
+          const c = expectedShape[3] || 1;
+          if (msg.inputData.length === h * w && c === 3) {
+            return raw.reshape([1, h, w, 1]).tile([1, 1, 1, 3]);
+          }
+          return raw.reshape([1, h, w, c]);
         }
         return raw.reshape([1, 28, 28, 1]);
       });
@@ -195,6 +215,67 @@ self.onmessage = async (e: MessageEvent<TrainingInMessage>) => {
     } catch (err: any) {
       self.postMessage({
         type: 'PREDICTION_ERROR',
+        id: msg.id,
+        error: err?.message || String(err),
+      });
+    }
+    return;
+  }
+
+  if (msg.type === 'GET_TEST_SAMPLES') {
+    try {
+      let testData = activeTestData;
+      if (!testData) {
+        const rawData = generateSyntheticMnist(200);
+        let testImages: tf.Tensor = rawData.testImages;
+        if (rawData.testImages.rank === 4 && rawData.testImages.shape[1] === 1) {
+          testImages = rawData.testImages.transpose([0, 2, 3, 1]);
+          rawData.testImages.dispose();
+        }
+        rawData.trainImages.dispose();
+        rawData.trainLabels.dispose();
+        testData = {
+          testImages,
+          testLabels: rawData.testLabels,
+        };
+        activeTestData = testData;
+      }
+
+      const total = testData.testImages.shape[0];
+      const count = Math.min(10, total);
+      const samples: Array<{ index: number; trueClass: number; pixels: number[] }> = [];
+
+      for (let i = 0; i < count; i++) {
+        const is2d = testData.testImages.rank === 2;
+        const imgSlice = is2d
+          ? testData.testImages.slice([i, 0], [1, -1])
+          : testData.testImages.slice([i, 0, 0, 0], [1, -1, -1, -1]);
+        const lblSlice = testData.testLabels.slice([i, 0], [1, -1]);
+
+        const pixels = Array.from(await imgSlice.data());
+        const oneHot = Array.from(await lblSlice.data());
+        let trueClass = 0;
+        let maxV = oneHot[0] ?? 0;
+        for (let c = 1; c < oneHot.length; c++) {
+          if (oneHot[c] > maxV) {
+            maxV = oneHot[c];
+            trueClass = c;
+          }
+        }
+
+        samples.push({ index: i, trueClass, pixels });
+        imgSlice.dispose();
+        lblSlice.dispose();
+      }
+
+      self.postMessage({
+        type: 'TEST_SAMPLES_COMPLETED',
+        id: msg.id,
+        samples,
+      });
+    } catch (err: any) {
+      self.postMessage({
+        type: 'TEST_SAMPLES_ERROR',
         id: msg.id,
         error: err?.message || String(err),
       });
