@@ -88,6 +88,11 @@ export const PredictCanvas: React.FC<PredictCanvasProps> = () => {
   const training = useTrainingSafe();
   const graph = useGraphStore((state) => state.graph);
 
+  const trainingRef = useRef(training);
+  trainingRef.current = training;
+  const graphRef = useRef(graph);
+  graphRef.current = graph;
+
   // Extract active dataset metadata to retrieve dynamic classes
   const datasetNode = graph.nodes.find((n) => n.type === 'LoadDataset' || n.type === 'Dataset');
   const datasetId = String(datasetNode?.params.dataset || datasetNode?.params.name || 'mnist');
@@ -96,18 +101,19 @@ export const PredictCanvas: React.FC<PredictCanvasProps> = () => {
 
   const triggerRealPrediction = useCallback(
     async (canvas: HTMLCanvasElement) => {
-      if (!training) return;
+      const activeTraining = trainingRef.current;
+      if (!activeTraining) return;
       const pixels = extractCanvasPixels(canvas);
 
       try {
-        const result = await training.runPrediction(pixels, [1, 28, 28, 1], graph);
+        const result = await activeTraining.runPrediction(pixels, [1, 28, 28, 1], graphRef.current);
         setPredictedIndex(result.topClass);
         setConfidences(result.probabilities);
       } catch (err) {
         console.warn('Real prediction inference failed:', err);
       }
     },
-    [training, graph]
+    []
   );
 
   const clearCanvas = useCallback(() => {
@@ -118,8 +124,8 @@ export const PredictCanvas: React.FC<PredictCanvasProps> = () => {
     ctx.fillStyle = '#0f172a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     setPredictedIndex(null);
-    setConfidences(new Array(classes.length).fill(1 / classes.length));
-  }, [classes.length]);
+    setConfidences([]);
+  }, []);
 
   const drawRandomSample = useCallback(
     (targetDigit?: number) => {
@@ -154,10 +160,11 @@ export const PredictCanvas: React.FC<PredictCanvasProps> = () => {
     [triggerRealPrediction]
   );
 
+  // Initialize once on mount with sample digit 7
   useEffect(() => {
-    clearCanvas();
     drawRandomSample(7);
-  }, [clearCanvas, drawRandomSample]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const getCanvasCoords = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;

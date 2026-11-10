@@ -32,11 +32,13 @@ export interface StopTrainingMessage {
 
 export interface RunEvaluationMessage {
   type: 'RUN_EVALUATION';
+  id?: string;
   graph: Graph;
 }
 
 export interface RunPredictionMessage {
   type: 'RUN_PREDICTION';
+  id?: string;
   inputData: number[];
   shape?: number[];
   graph?: Graph;
@@ -118,20 +120,25 @@ self.onmessage = async (e: MessageEvent<TrainingInMessage>) => {
       }
 
       // Real evaluation using TensorFlow.js
-      const evalResult = model.evaluate(testData.testImages, testData.testLabels) as tf.Scalar[];
-      const loss = (await evalResult[0].data())[0];
-      const acc = (await evalResult[1].data())[0];
-      evalResult[0].dispose();
-      evalResult[1].dispose();
+      const rawEval = model.evaluate(testData.testImages, testData.testLabels);
+      const evalTensors = Array.isArray(rawEval) ? rawEval : [rawEval];
+      const loss = (await evalTensors[0].data())[0];
+      const acc = evalTensors.length > 1 ? (await evalTensors[1].data())[0] : 0;
+      evalTensors.forEach((t) => {
+        try { t.dispose(); } catch {}
+      });
 
       self.postMessage({
         type: 'EVALUATION_COMPLETED',
+        id: msg.id,
         loss,
         accuracy: acc,
+        sampleCount: testData.testImages.shape[0],
       });
     } catch (err: any) {
       self.postMessage({
         type: 'EVALUATION_ERROR',
+        id: msg.id,
         error: err?.message || String(err),
       });
     }
@@ -181,12 +188,14 @@ self.onmessage = async (e: MessageEvent<TrainingInMessage>) => {
 
       self.postMessage({
         type: 'PREDICTION_COMPLETED',
+        id: msg.id,
         probabilities: probArray,
         topClass,
       });
     } catch (err: any) {
       self.postMessage({
         type: 'PREDICTION_ERROR',
+        id: msg.id,
         error: err?.message || String(err),
       });
     }
@@ -307,6 +316,7 @@ self.onmessage = async (e: MessageEvent<TrainingInMessage>) => {
         type: 'TRAINING_COMPLETED',
         finalLoss: testLoss,
         finalAccuracy: testAcc,
+        sampleCount: data.testImages.shape[0],
         numTensors: tf.memory().numTensors,
       });
     } catch (err: any) {

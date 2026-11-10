@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
-import { Trash2, Play, Square, Info, BarChart2 } from 'lucide-react';
+import { Trash2, Play, Square, Info, BarChart2, Loader2, Check } from 'lucide-react';
 import { getNodeDefinition } from '../nodes/registry';
 import { useGraphStore } from '../core/store';
 import { formatShape, TensorShape } from '../core/shapeEngine';
@@ -28,11 +28,9 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
   const removeNode = useGraphStore((state) => state.removeNode);
   const training = useTrainingSafe();
   const [showInfo, setShowInfo] = useState(false);
-  const [evalResult, setEvalResult] = useState<{ acc: number; loss: number; evaluated: boolean }>({
-    acc: 93.2,
-    loss: 0.241,
-    evaluated: false,
-  });
+  const [isEvaluatingLocal, setIsEvaluatingLocal] = useState(false);
+  const [evalError, setEvalError] = useState<string | null>(null);
+  const [lastEvalTime, setLastEvalTime] = useState<string | null>(null);
 
   const graphNode = graph.nodes.find((n) => n.id === id);
 
@@ -304,8 +302,6 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
               <strong style={{ color: '#22c55e' }}>
                 {training?.evalResult
                   ? `${(training.evalResult.accuracy * 100).toFixed(1)}%`
-                  : evalResult.evaluated
-                  ? `${evalResult.acc.toFixed(1)}%`
                   : training?.latestAccuracy !== null && training?.latestAccuracy !== undefined
                   ? `${(training.latestAccuracy * 100).toFixed(1)}%`
                   : '—'}
@@ -316,27 +312,78 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
               <strong style={{ color: '#f59e0b' }}>
                 {training?.evalResult
                   ? training.evalResult.loss.toFixed(3)
-                  : evalResult.evaluated
-                  ? evalResult.loss.toFixed(3)
                   : training?.latestLoss !== null && training?.latestLoss !== undefined
                   ? training.latestLoss.toFixed(3)
                   : '—'}
               </strong>
             </div>
+
+            {/* Test Split Telemetry & Status */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: '0.62rem',
+                color: '#64748b',
+                fontFamily: 'monospace',
+                paddingTop: 2,
+                borderTop: '1px dashed #1e293b',
+              }}
+            >
+              <span>
+                {training?.evalResult?.sampleCount
+                  ? `${training.evalResult.sampleCount} test samples`
+                  : 'Held-out test split'}
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                {isEvaluatingLocal || training?.isEvaluating ? (
+                  <>
+                    <Loader2 size={10} style={{ color: '#38bdf8', animation: 'spin 1s linear infinite' }} />
+                    <span style={{ color: '#38bdf8' }}>Evaluating...</span>
+                  </>
+                ) : lastEvalTime || training?.evalResult?.evaluatedAt ? (
+                  <>
+                    <Check size={10} style={{ color: '#22c55e' }} />
+                    <span style={{ color: '#22c55e' }}>{lastEvalTime || training?.evalResult?.evaluatedAt}</span>
+                  </>
+                ) : (
+                  <span>Ready</span>
+                )}
+              </span>
+            </div>
+
+            {/* Error Message if Evaluation Fails */}
+            {evalError && (
+              <div
+                style={{
+                  padding: '4px 6px',
+                  backgroundColor: '#450a0a',
+                  border: '1px solid #b91c1c',
+                  borderRadius: 4,
+                  color: '#fca5a5',
+                  fontSize: '0.62rem',
+                }}
+              >
+                ⚠️ {evalError}
+              </div>
+            )}
+
             <button
-              disabled={training?.isEvaluating}
+              disabled={isEvaluatingLocal || training?.isEvaluating}
               onClick={async (e) => {
                 e.stopPropagation();
                 if (!training) return;
+                setIsEvaluatingLocal(true);
+                setEvalError(null);
                 try {
                   const res = await training.runEvaluation(graph);
-                  setEvalResult({
-                    acc: res.accuracy * 100,
-                    loss: res.loss,
-                    evaluated: true,
-                  });
-                } catch (err) {
+                  setLastEvalTime(res.evaluatedAt || new Date().toLocaleTimeString());
+                } catch (err: any) {
                   console.error('Real evaluation failed:', err);
+                  setEvalError(err?.message || 'Evaluation failed. Make sure model is connected.');
+                } finally {
+                  setIsEvaluatingLocal(false);
                 }
               }}
               style={{
@@ -348,22 +395,29 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
                 color: '#38bdf8',
                 fontSize: '0.72rem',
                 fontWeight: 600,
-                cursor: training?.isEvaluating ? 'wait' : 'pointer',
+                cursor: (isEvaluatingLocal || training?.isEvaluating) ? 'wait' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 4,
-                opacity: training?.isEvaluating ? 0.6 : 1,
+                gap: 5,
+                opacity: (isEvaluatingLocal || training?.isEvaluating) ? 0.6 : 1,
               }}
             >
-              <BarChart2 size={12} />
-              <span>
-                {training?.isEvaluating
-                  ? 'Evaluating Model...'
-                  : (training?.evalResult || evalResult.evaluated)
-                  ? 'Re-run Evaluation'
-                  : 'Run Evaluation'}
-              </span>
+              {isEvaluatingLocal || training?.isEvaluating ? (
+                <>
+                  <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
+                  <span>Evaluating Model...</span>
+                </>
+              ) : (
+                <>
+                  <BarChart2 size={12} />
+                  <span>
+                    {(training?.evalResult || lastEvalTime)
+                      ? 'Re-run Evaluation'
+                      : 'Run Evaluation'}
+                  </span>
+                </>
+              )}
             </button>
           </div>
         )}

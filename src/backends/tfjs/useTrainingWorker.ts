@@ -16,6 +16,8 @@ export interface EpochLog {
 export interface EvaluationResult {
   loss: number;
   accuracy: number;
+  sampleCount?: number;
+  evaluatedAt?: string;
 }
 
 export interface PredictionResult {
@@ -59,18 +61,9 @@ export function useTrainingWorker(): TrainingWorkerState {
   const [evalResult, setEvalResult] = useState<EvaluationResult | null>(null);
   const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
 
-  const [predictResult, setPredictResult] = useState<PredictionResult | null>(null);
-  const [isPredicting, setIsPredicting] = useState<boolean>(false);
-
   const workerRef = useRef<Worker | null>(null);
-  const evalPromiseRef = useRef<{
-    resolve: (val: EvaluationResult) => void;
-    reject: (err: any) => void;
-  } | null>(null);
-  const predictPromiseRef = useRef<{
-    resolve: (val: PredictionResult) => void;
-    reject: (err: any) => void;
-  } | null>(null);
+  const pendingEvaluations = useRef<Map<string, { resolve: (val: EvaluationResult) => void; reject: (err: any) => void }>>(new Map());
+  const pendingPredictions = useRef<Map<string, { resolve: (val: PredictionResult) => void; reject: (err: any) => void }>>(new Map());
 
   // Initialize Worker using Vite's standard module worker constructor
   useEffect(() => {
@@ -115,12 +108,20 @@ export function useTrainingWorker(): TrainingWorkerState {
             ]);
             break;
 
-          case 'TRAINING_COMPLETED':
+          case 'TRAINING_COMPLETED': {
             setStatus('completed');
             setLatestLoss(msg.finalLoss);
             setLatestAccuracy(msg.finalAccuracy);
             setNumTensors(msg.numTensors || 0);
+            const nowStr = new Date().toLocaleTimeString();
+            setEvalResult({
+              loss: msg.finalLoss,
+              accuracy: msg.finalAccuracy,
+              sampleCount: msg.sampleCount || 160,
+              evaluatedAt: nowStr,
+            });
             break;
+          }
 
           case 'TRAINING_STOPPED':
             setStatus('idle');
@@ -131,39 +132,50 @@ export function useTrainingWorker(): TrainingWorkerState {
             setErrorMessage(msg.error);
             break;
 
-          case 'EVALUATION_COMPLETED':
+          case 'EVALUATION_COMPLETED': {
             setIsEvaluating(false);
-            setEvalResult({ loss: msg.loss, accuracy: msg.accuracy });
-            if (evalPromiseRef.current) {
-              evalPromiseRef.current.resolve({ loss: msg.loss, accuracy: msg.accuracy });
-              evalPromiseRef.current = null;
+            const nowStr = new Date().toLocaleTimeString();
+            const result: EvaluationResult = {
+              loss: msg.loss,
+              accuracy: msg.accuracy,
+              sampleCount: msg.sampleCount,
+              evaluatedAt: nowStr,
+            };
+            setEvalResult(result);
+            if (msg.id && pendingEvaluations.current.has(msg.id)) {
+              pendingEvaluations.current.get(msg.id)!.resolve(result);
+              pendingEvaluations.current.delete(msg.id);
             }
             break;
+          }
 
-          case 'EVALUATION_ERROR':
+          case 'EVALUATION_ERROR': {
             setIsEvaluating(false);
-            if (evalPromiseRef.current) {
-              evalPromiseRef.current.reject(new Error(msg.error));
-              evalPromiseRef.current = null;
+            if (msg.id && pendingEvaluations.current.has(msg.id)) {
+              pendingEvaluations.current.get(msg.id)!.reject(new Error(msg.error));
+              pendingEvaluations.current.delete(msg.id);
             }
             break;
+          }
 
-          case 'PREDICTION_COMPLETED':
-            setIsPredicting(false);
-            setPredictResult({ probabilities: msg.probabilities, topClass: msg.topClass });
-            if (predictPromiseRef.current) {
-              predictPromiseRef.current.resolve({ probabilities: msg.probabilities, topClass: msg.topClass });
-              predictPromiseRef.current = null;
+          case 'PREDICTION_COMPLETED': {
+            if (msg.id && pendingPredictions.current.has(msg.id)) {
+              pendingPredictions.current.get(msg.id)!.resolve({
+                probabilities: msg.probabilities,
+                topClass: msg.topClass,
+              });
+              pendingPredictions.current.delete(msg.id);
             }
             break;
+          }
 
-          case 'PREDICTION_ERROR':
-            setIsPredicting(false);
-            if (predictPromiseRef.current) {
-              predictPromiseRef.current.reject(new Error(msg.error));
-              predictPromiseRef.current = null;
+          case 'PREDICTION_ERROR': {
+            if (msg.id && pendingPredictions.current.has(msg.id)) {
+              pendingPredictions.current.get(msg.id)!.reject(new Error(msg.error));
+              pendingPredictions.current.delete(msg.id);
             }
             break;
+          }
         }
       };
 
@@ -210,7 +222,6 @@ export function useTrainingWorker(): TrainingWorkerState {
     setHistory([]);
     setErrorMessage(null);
     setEvalResult(null);
-    setPredictResult(null);
   }, []);
 
   const runEvaluation = useCallback((graph: Graph): Promise<EvaluationResult> => {
@@ -220,9 +231,11 @@ export function useTrainingWorker(): TrainingWorkerState {
         return;
       }
       setIsEvaluating(true);
-      evalPromiseRef.current = { resolve, reject };
+      const id = `eval_${Date.now()}_${Math.random()}`;
+      pendingEvaluations.current.set(id, { resolve, reject });
       workerRef.current.postMessage({
         type: 'RUN_EVALUATION',
+        id,
         graph,
       });
     });
@@ -234,10 +247,11 @@ export function useTrainingWorker(): TrainingWorkerState {
         reject(new Error('Web Worker not initialized'));
         return;
       }
-      setIsPredicting(true);
-      predictPromiseRef.current = { resolve, reject };
+      const id = `pred_${Date.now()}_${Math.random()}`;
+      pendingPredictions.current.set(id, { resolve, reject });
       workerRef.current.postMessage({
         type: 'RUN_PREDICTION',
+        id,
         inputData,
         shape,
         graph,
@@ -260,8 +274,8 @@ export function useTrainingWorker(): TrainingWorkerState {
     evalResult,
     isEvaluating,
     runEvaluation,
-    predictResult,
-    isPredicting,
+    predictResult: null,
+    isPredicting: false,
     runPrediction,
   };
 }

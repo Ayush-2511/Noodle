@@ -381,5 +381,63 @@ describe('Noodle v2 Pipeline Paradigm', () => {
       evalRes.forEach((t) => t.dispose());
       model.dispose();
     });
+
+    it('compiles and evaluates a full template graph with Train, Evaluate, and Predict nodes', () => {
+      const fullGraph: Graph = {
+        version: 2,
+        nodes: [
+          { id: 'n1', type: 'LoadDataset', params: { dataset: 'mnist' } },
+          { id: 'n2', type: 'Shuffle', params: {} },
+          { id: 'n3', type: 'TrainTestSplit', params: {} },
+          { id: 'n4', type: 'Normalize', params: {} },
+          {
+            id: 'n5',
+            type: 'FeatureExtractor',
+            params: {},
+            layers: [
+              { id: 'l1', type: 'Conv2D', params: { filters: 4, kernel: 3, stride: 1, padding: 1 } },
+              { id: 'l2', type: 'ReLU', params: {} },
+              { id: 'l3', type: 'MaxPool2D', params: { kernel: 2, stride: 2 } },
+            ],
+          },
+          { id: 'n6', type: 'Flatten', params: {} },
+          {
+            id: 'n7',
+            type: 'Classifier',
+            params: { loss: 'cross_entropy' },
+            layers: [
+              { id: 'l1', type: 'Linear', params: { neurons: 10 } },
+            ],
+          },
+          { id: 'n8', type: 'Train', params: { optimizer: 'adam', lr: 0.001, epochs: 1, batch_size: 16 } },
+          { id: 'n9', type: 'Evaluate', params: {} },
+          { id: 'n10', type: 'Predict', params: {} },
+          { id: 'n11', type: 'Metrics', params: {} },
+        ],
+        edges: [
+          { from: 'n1.data', to: 'n2.data' },
+          { from: 'n2.data', to: 'n3.data' },
+          { from: 'n3.train', to: 'n4.in' },
+          { from: 'n4.out', to: 'n5.in' },
+          { from: 'n5.out', to: 'n6.in' },
+          { from: 'n6.out', to: 'n7.in' },
+          { from: 'n7.model', to: 'n8.model' },
+          { from: 'n8.trained_model', to: 'n9.trained_model' },
+          { from: 'n8.trained_model', to: 'n10.trained_model' },
+          { from: 'n8.metrics', to: 'n11.metrics' },
+        ],
+      };
+
+      const compiled = compileGraphToTfjs(fullGraph);
+      expect(compiled.model).toBeDefined();
+
+      const dummy = tf.zeros([2, 28, 28, 1]);
+      const res = compiled.model.predict(dummy) as tf.Tensor;
+      expect(res.shape).toEqual([2, 10]);
+
+      dummy.dispose();
+      res.dispose();
+      compiled.model.dispose();
+    });
   });
 });
