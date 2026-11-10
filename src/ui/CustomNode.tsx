@@ -301,20 +301,43 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
           <div style={{ marginTop: 6, padding: '6px 8px', backgroundColor: '#0f172a', borderRadius: 4, border: '1px solid #334155', display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem' }}>
               <span style={{ color: '#94a3b8' }}>Test Accuracy:</span>
-              <strong style={{ color: '#22c55e' }}>{evalResult.evaluated ? `${evalResult.acc.toFixed(1)}%` : '—'}</strong>
+              <strong style={{ color: '#22c55e' }}>
+                {training?.evalResult
+                  ? `${(training.evalResult.accuracy * 100).toFixed(1)}%`
+                  : evalResult.evaluated
+                  ? `${evalResult.acc.toFixed(1)}%`
+                  : training?.latestAccuracy !== null && training?.latestAccuracy !== undefined
+                  ? `${(training.latestAccuracy * 100).toFixed(1)}%`
+                  : '—'}
+              </strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem' }}>
               <span style={{ color: '#94a3b8' }}>Test Loss:</span>
-              <strong style={{ color: '#f59e0b' }}>{evalResult.evaluated ? evalResult.loss.toFixed(3) : '—'}</strong>
+              <strong style={{ color: '#f59e0b' }}>
+                {training?.evalResult
+                  ? training.evalResult.loss.toFixed(3)
+                  : evalResult.evaluated
+                  ? evalResult.loss.toFixed(3)
+                  : training?.latestLoss !== null && training?.latestLoss !== undefined
+                  ? training.latestLoss.toFixed(3)
+                  : '—'}
+              </strong>
             </div>
             <button
-              onClick={(e) => {
+              disabled={training?.isEvaluating}
+              onClick={async (e) => {
                 e.stopPropagation();
-                setEvalResult({
-                  acc: 91.0 + Math.random() * 6.5,
-                  loss: 0.18 + Math.random() * 0.12,
-                  evaluated: true,
-                });
+                if (!training) return;
+                try {
+                  const res = await training.runEvaluation(graph);
+                  setEvalResult({
+                    acc: res.accuracy * 100,
+                    loss: res.loss,
+                    evaluated: true,
+                  });
+                } catch (err) {
+                  console.error('Real evaluation failed:', err);
+                }
               }}
               style={{
                 width: '100%',
@@ -325,15 +348,22 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
                 color: '#38bdf8',
                 fontSize: '0.72rem',
                 fontWeight: 600,
-                cursor: 'pointer',
+                cursor: training?.isEvaluating ? 'wait' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 4,
+                opacity: training?.isEvaluating ? 0.6 : 1,
               }}
             >
               <BarChart2 size={12} />
-              <span>{evalResult.evaluated ? 'Re-run Evaluation' : 'Run Evaluation'}</span>
+              <span>
+                {training?.isEvaluating
+                  ? 'Evaluating Model...'
+                  : (training?.evalResult || evalResult.evaluated)
+                  ? 'Re-run Evaluation'
+                  : 'Run Evaluation'}
+              </span>
             </button>
           </div>
         )}

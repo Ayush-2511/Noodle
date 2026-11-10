@@ -13,6 +13,16 @@ export interface EpochLog {
   numTensors: number;
 }
 
+export interface EvaluationResult {
+  loss: number;
+  accuracy: number;
+}
+
+export interface PredictionResult {
+  probabilities: number[];
+  topClass: number;
+}
+
 export interface TrainingWorkerState {
   status: TrainingStatus;
   currentEpoch: number;
@@ -25,6 +35,15 @@ export interface TrainingWorkerState {
   startTraining: (graph: Graph, config?: WorkerTrainingConfig) => void;
   stopTraining: () => void;
   resetTraining: () => void;
+
+  // Real evaluation & prediction
+  evalResult: EvaluationResult | null;
+  isEvaluating: boolean;
+  runEvaluation: (graph: Graph) => Promise<EvaluationResult>;
+
+  predictResult: PredictionResult | null;
+  isPredicting: boolean;
+  runPrediction: (inputData: number[], shape?: number[], graph?: Graph) => Promise<PredictionResult>;
 }
 
 export function useTrainingWorker(): TrainingWorkerState {
@@ -37,7 +56,21 @@ export function useTrainingWorker(): TrainingWorkerState {
   const [numTensors, setNumTensors] = useState<number>(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const [evalResult, setEvalResult] = useState<EvaluationResult | null>(null);
+  const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
+
+  const [predictResult, setPredictResult] = useState<PredictionResult | null>(null);
+  const [isPredicting, setIsPredicting] = useState<boolean>(false);
+
   const workerRef = useRef<Worker | null>(null);
+  const evalPromiseRef = useRef<{
+    resolve: (val: EvaluationResult) => void;
+    reject: (err: any) => void;
+  } | null>(null);
+  const predictPromiseRef = useRef<{
+    resolve: (val: PredictionResult) => void;
+    reject: (err: any) => void;
+  } | null>(null);
 
   // Initialize Worker using Vite's standard module worker constructor
   useEffect(() => {
@@ -97,6 +130,40 @@ export function useTrainingWorker(): TrainingWorkerState {
             setStatus('error');
             setErrorMessage(msg.error);
             break;
+
+          case 'EVALUATION_COMPLETED':
+            setIsEvaluating(false);
+            setEvalResult({ loss: msg.loss, accuracy: msg.accuracy });
+            if (evalPromiseRef.current) {
+              evalPromiseRef.current.resolve({ loss: msg.loss, accuracy: msg.accuracy });
+              evalPromiseRef.current = null;
+            }
+            break;
+
+          case 'EVALUATION_ERROR':
+            setIsEvaluating(false);
+            if (evalPromiseRef.current) {
+              evalPromiseRef.current.reject(new Error(msg.error));
+              evalPromiseRef.current = null;
+            }
+            break;
+
+          case 'PREDICTION_COMPLETED':
+            setIsPredicting(false);
+            setPredictResult({ probabilities: msg.probabilities, topClass: msg.topClass });
+            if (predictPromiseRef.current) {
+              predictPromiseRef.current.resolve({ probabilities: msg.probabilities, topClass: msg.topClass });
+              predictPromiseRef.current = null;
+            }
+            break;
+
+          case 'PREDICTION_ERROR':
+            setIsPredicting(false);
+            if (predictPromiseRef.current) {
+              predictPromiseRef.current.reject(new Error(msg.error));
+              predictPromiseRef.current = null;
+            }
+            break;
         }
       };
 
@@ -142,6 +209,40 @@ export function useTrainingWorker(): TrainingWorkerState {
     setLatestAccuracy(null);
     setHistory([]);
     setErrorMessage(null);
+    setEvalResult(null);
+    setPredictResult(null);
+  }, []);
+
+  const runEvaluation = useCallback((graph: Graph): Promise<EvaluationResult> => {
+    return new Promise((resolve, reject) => {
+      if (!workerRef.current) {
+        reject(new Error('Web Worker not initialized'));
+        return;
+      }
+      setIsEvaluating(true);
+      evalPromiseRef.current = { resolve, reject };
+      workerRef.current.postMessage({
+        type: 'RUN_EVALUATION',
+        graph,
+      });
+    });
+  }, []);
+
+  const runPrediction = useCallback((inputData: number[], shape?: number[], graph?: Graph): Promise<PredictionResult> => {
+    return new Promise((resolve, reject) => {
+      if (!workerRef.current) {
+        reject(new Error('Web Worker not initialized'));
+        return;
+      }
+      setIsPredicting(true);
+      predictPromiseRef.current = { resolve, reject };
+      workerRef.current.postMessage({
+        type: 'RUN_PREDICTION',
+        inputData,
+        shape,
+        graph,
+      });
+    });
   }, []);
 
   return {
@@ -156,6 +257,12 @@ export function useTrainingWorker(): TrainingWorkerState {
     startTraining,
     stopTraining,
     resetTraining,
+    evalResult,
+    isEvaluating,
+    runEvaluation,
+    predictResult,
+    isPredicting,
+    runPrediction,
   };
 }
 

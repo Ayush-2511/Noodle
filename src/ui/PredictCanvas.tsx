@@ -1,5 +1,8 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { RotateCcw, Shuffle } from 'lucide-react';
+import { useTrainingSafe } from '../backends/tfjs/TrainingContext';
+import { useGraphStore } from '../core/store';
+import { getDatasetMeta } from '../core/datasets';
 
 interface PredictCanvasProps {
   nodeId: string;
@@ -54,13 +57,58 @@ const SAMPLE_DIGITS: Record<number, number[][]> = {
   ],
 };
 
+function extractCanvasPixels(canvas: HTMLCanvasElement): number[] {
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = 28;
+  tempCanvas.height = 28;
+  const tempCtx = tempCanvas.getContext('2d');
+  if (!tempCtx) return new Array(784).fill(0);
+
+  tempCtx.drawImage(canvas, 0, 0, 28, 28);
+  const imgData = tempCtx.getImageData(0, 0, 28, 28);
+  const pixels: number[] = [];
+
+  for (let i = 0; i < imgData.data.length; i += 4) {
+    const r = imgData.data[i];
+    const g = imgData.data[i + 1];
+    const b = imgData.data[i + 2];
+    const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    pixels.push(brightness);
+  }
+
+  return pixels;
+}
+
 export const PredictCanvas: React.FC<PredictCanvasProps> = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [predictedDigit, setPredictedDigit] = useState<number | null>(7);
-  const [confidences, setConfidences] = useState<number[]>([
-    0.01, 0.03, 0.01, 0.01, 0.01, 0.01, 0.02, 0.88, 0.01, 0.01,
-  ]);
+  const [predictedIndex, setPredictedIndex] = useState<number | null>(null);
+  const [confidences, setConfidences] = useState<number[]>([]);
+
+  const training = useTrainingSafe();
+  const graph = useGraphStore((state) => state.graph);
+
+  // Extract active dataset metadata to retrieve dynamic classes
+  const datasetNode = graph.nodes.find((n) => n.type === 'LoadDataset' || n.type === 'Dataset');
+  const datasetId = String(datasetNode?.params.dataset || datasetNode?.params.name || 'mnist');
+  const meta = getDatasetMeta(datasetId);
+  const classes = meta.classes;
+
+  const triggerRealPrediction = useCallback(
+    async (canvas: HTMLCanvasElement) => {
+      if (!training) return;
+      const pixels = extractCanvasPixels(canvas);
+
+      try {
+        const result = await training.runPrediction(pixels, [1, 28, 28, 1], graph);
+        setPredictedIndex(result.topClass);
+        setConfidences(result.probabilities);
+      } catch (err) {
+        console.warn('Real prediction inference failed:', err);
+      }
+    },
+    [training, graph]
+  );
 
   const clearCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -69,53 +117,47 @@ export const PredictCanvas: React.FC<PredictCanvasProps> = () => {
     if (!ctx) return;
     ctx.fillStyle = '#0f172a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    setPredictedDigit(null);
-    setConfidences(new Array(10).fill(0.1));
-  }, []);
+    setPredictedIndex(null);
+    setConfidences(new Array(classes.length).fill(1 / classes.length));
+  }, [classes.length]);
 
-  useEffect(() => {
-    // Initial black background with a sample "7"
-    clearCanvas();
-    drawRandomDigit(7);
-  }, [clearCanvas]);
+  const drawRandomSample = useCallback(
+    (targetDigit?: number) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-  function drawRandomDigit(targetDigit?: number) {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.fillStyle = '#0f172a';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const digits = [0, 1, 3, 7, 8];
+      const d = targetDigit !== undefined ? targetDigit : digits[Math.floor(Math.random() * digits.length)];
+      const proto = SAMPLE_DIGITS[d] || SAMPLE_DIGITS[7];
 
-    const digits = [0, 1, 3, 7, 8];
-    const d = targetDigit !== undefined ? targetDigit : digits[Math.floor(Math.random() * digits.length)];
-    const proto = SAMPLE_DIGITS[d] || SAMPLE_DIGITS[7];
+      ctx.fillStyle = '#f8fafc';
+      const cellW = canvas.width / 7;
+      const cellH = canvas.height / 7;
 
-    ctx.fillStyle = '#f8fafc';
-    const cellW = canvas.width / 7;
-    const cellH = canvas.height / 7;
-
-    for (let r = 0; r < 7; r++) {
-      for (let c = 0; c < 7; c++) {
-        if (proto[r][c] === 1) {
-          ctx.beginPath();
-          ctx.arc(c * cellW + cellW / 2, r * cellH + cellH / 2, cellW * 0.42, 0, Math.PI * 2);
-          ctx.fill();
+      for (let r = 0; r < 7; r++) {
+        for (let c = 0; c < 7; c++) {
+          if (proto[r][c] === 1) {
+            ctx.beginPath();
+            ctx.arc(c * cellW + cellW / 2, r * cellH + cellH / 2, cellW * 0.42, 0, Math.PI * 2);
+            ctx.fill();
+          }
         }
       }
-    }
 
-    setPredictedDigit(d);
+      triggerRealPrediction(canvas);
+    },
+    [triggerRealPrediction]
+  );
 
-    // Simulated soft probabilities skewed to d
-    const newConf = Array.from({ length: 10 }, (_, i) => {
-      if (i === d) return 0.85 + Math.random() * 0.12;
-      return Math.random() * 0.03;
-    });
-    const sum = newConf.reduce((a, b) => a + b, 0);
-    setConfidences(newConf.map((c) => c / sum));
-  }
+  useEffect(() => {
+    clearCanvas();
+    drawRandomSample(7);
+  }, [clearCanvas, drawRandomSample]);
 
   const getCanvasCoords = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -163,16 +205,17 @@ export const PredictCanvas: React.FC<PredictCanvasProps> = () => {
     e.stopPropagation();
     setIsDrawing(false);
 
-    // Trigger prediction update based on drawing density/center
-    const d = Math.floor(Math.random() * 10);
-    setPredictedDigit(d);
-    const newConf = Array.from({ length: 10 }, (_, i) => {
-      if (i === d) return 0.75 + Math.random() * 0.2;
-      return Math.random() * 0.05;
-    });
-    const sum = newConf.reduce((a, b) => a + b, 0);
-    setConfidences(newConf.map((c) => c / sum));
+    const canvas = canvasRef.current;
+    if (canvas) {
+      triggerRealPrediction(canvas);
+    }
   };
+
+  const displayLabel = predictedIndex !== null && classes[predictedIndex] ? classes[predictedIndex] : '—';
+  const displayConfidence =
+    predictedIndex !== null && confidences[predictedIndex] !== undefined
+      ? `${(confidences[predictedIndex] * 100).toFixed(1)}%`
+      : '';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}>
@@ -228,7 +271,7 @@ export const PredictCanvas: React.FC<PredictCanvasProps> = () => {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                drawRandomDigit();
+                drawRandomSample();
               }}
               style={{
                 flex: 1,
@@ -251,7 +294,7 @@ export const PredictCanvas: React.FC<PredictCanvasProps> = () => {
           </div>
         </div>
 
-        {/* Prediction Results & Class Bars */}
+        {/* Prediction Results & Dynamic Class Bars */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
           <div
             style={{
@@ -266,20 +309,34 @@ export const PredictCanvas: React.FC<PredictCanvasProps> = () => {
             }}
           >
             <span>
-              Pred: <strong style={{ color: '#22c55e', fontSize: '0.85rem' }}>{predictedDigit !== null ? predictedDigit : '—'}</strong>
+              Pred: <strong style={{ color: '#22c55e', fontSize: '0.85rem' }}>{displayLabel}</strong>
             </span>
             <span style={{ color: '#94a3b8', fontSize: '0.62rem' }}>
-              {predictedDigit !== null ? `${(confidences[predictedDigit] * 100).toFixed(1)}%` : ''}
+              {displayConfidence}
             </span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {confidences.map((conf, digit) => {
-              const isTop = digit === predictedDigit;
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 115, overflowY: 'auto' }}>
+            {classes.map((clsName, idx) => {
+              const conf = confidences[idx] ?? (1 / classes.length);
+              const isTop = idx === predictedIndex;
+
               return (
-                <div key={digit} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.62rem' }}>
-                  <span style={{ width: 10, textAlign: 'right', fontFamily: 'monospace', color: isTop ? '#22c55e' : '#94a3b8', fontWeight: isTop ? 700 : 400 }}>
-                    {digit}
+                <div key={clsName} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.62rem' }}>
+                  <span
+                    title={clsName}
+                    style={{
+                      width: 42,
+                      textAlign: 'right',
+                      fontFamily: 'monospace',
+                      color: isTop ? '#22c55e' : '#94a3b8',
+                      fontWeight: isTop ? 700 : 400,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {clsName}
                   </span>
                   <div style={{ flex: 1, height: 5, backgroundColor: '#0f172a', borderRadius: 2, overflow: 'hidden' }}>
                     <div
@@ -303,3 +360,4 @@ export const PredictCanvas: React.FC<PredictCanvasProps> = () => {
     </div>
   );
 };
+

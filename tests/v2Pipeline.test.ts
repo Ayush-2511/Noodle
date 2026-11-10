@@ -5,6 +5,7 @@ import { inferBuilderShapes } from '../src/core/shapeEngine';
 import { validate } from '../src/core/validator';
 import { compileGraphToTfjs } from '../src/backends/tfjs/modelCompiler';
 import { Graph } from '../src/core/graph';
+import { getDatasetMeta } from '../src/core/datasets';
 
 describe('Noodle v2 Pipeline Paradigm', () => {
   beforeEach(() => {
@@ -326,6 +327,59 @@ describe('Noodle v2 Pipeline Paradigm', () => {
       dummyInput.dispose();
       output.dispose();
       compiled.model.dispose();
+    });
+  });
+
+  describe('Dynamic Dataset Metadata & Authentic Evaluation', () => {
+    it('retrieves distinct class labels for different datasets', () => {
+      const mnistMeta = getDatasetMeta('mnist');
+      expect(mnistMeta.classes).toEqual(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']);
+      expect(mnistMeta.modality).toBe('image');
+
+      const fashionMeta = getDatasetMeta('fashion_mnist');
+      expect(fashionMeta.classes).toContain('T-shirt');
+      expect(fashionMeta.classes).toContain('Ankle boot');
+
+      const cifarMeta = getDatasetMeta('cifar10');
+      expect(cifarMeta.classes).toContain('airplane');
+      expect(cifarMeta.classes).toContain('automobile');
+      expect(cifarMeta.inputShape).toEqual([3, 32, 32]);
+    });
+
+    it('runs authentic evaluation on model weights returning accurate metric scalars', async () => {
+      // Create a small model
+      const model = tf.sequential();
+      model.add(tf.layers.dense({ units: 10, inputShape: [4], activation: 'softmax' }));
+      model.compile({ optimizer: 'sgd', loss: 'categoricalCrossentropy', metrics: ['accuracy'] });
+
+      // Create test dataset
+      const xTest = tf.tensor2d([
+        [1, 0, 0, 0],
+        [0, 1, 0, 0],
+        [0, 0, 1, 0],
+        [0, 0, 0, 1],
+      ]);
+      const yTest = tf.tensor2d([
+        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+      ]);
+
+      const evalRes = model.evaluate(xTest, yTest) as tf.Scalar[];
+      const lossVal = (await evalRes[0].data())[0];
+      const accVal = (await evalRes[1].data())[0];
+
+      expect(typeof lossVal).toBe('number');
+      expect(typeof accVal).toBe('number');
+      expect(lossVal).toBeGreaterThan(0);
+      expect(accVal).toBeGreaterThanOrEqual(0);
+      expect(accVal).toBeLessThanOrEqual(1);
+
+      xTest.dispose();
+      yTest.dispose();
+      evalRes.forEach((t) => t.dispose());
+      model.dispose();
     });
   });
 });

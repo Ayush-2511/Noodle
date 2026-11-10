@@ -30,9 +30,46 @@ export interface StopTrainingMessage {
   type: 'STOP_TRAINING';
 }
 
-export type TrainingInMessage = StartTrainingMessage | StopTrainingMessage;
+export interface RunEvaluationMessage {
+  type: 'RUN_EVALUATION';
+  graph: Graph;
+}
+
+export interface RunPredictionMessage {
+  type: 'RUN_PREDICTION';
+  inputData: number[];
+  shape?: number[];
+  graph?: Graph;
+}
+
+export type TrainingInMessage =
+  | StartTrainingMessage
+  | StopTrainingMessage
+  | RunEvaluationMessage
+  | RunPredictionMessage;
 
 let activeModel: tf.LayersModel | null = null;
+let activeTestData: { testImages: tf.Tensor; testLabels: tf.Tensor } | null = null;
+
+function cleanupSession() {
+  if (activeTestData) {
+    try {
+      activeTestData.testImages.dispose();
+      activeTestData.testLabels.dispose();
+    } catch {
+      // ignore
+    }
+    activeTestData = null;
+  }
+  if (activeModel) {
+    try {
+      activeModel.dispose();
+    } catch {
+      // ignore
+    }
+    activeModel = null;
+  }
+}
 
 self.onmessage = async (e: MessageEvent<TrainingInMessage>) => {
   const msg = e.data;
@@ -45,10 +82,123 @@ self.onmessage = async (e: MessageEvent<TrainingInMessage>) => {
     return;
   }
 
+  if (msg.type === 'RUN_EVALUATION') {
+    try {
+      let model = activeModel;
+      let testData = activeTestData;
+
+      // If no model trained yet, compile an initial model from graph
+      if (!model) {
+        const compiled = compileGraphToTfjs(msg.graph);
+        model = compiled.model;
+        activeModel = model;
+      }
+
+      // If no test data loaded yet, load synthetic evaluation test data
+      if (!testData) {
+        const rawData = generateSyntheticMnist(200);
+        let testImages: tf.Tensor = rawData.testImages;
+        const expectedShape = model.inputs[0]?.shape;
+
+        if (expectedShape && expectedShape.length === 2 && expectedShape[1] === 784) {
+          testImages = rawData.testImages.reshape([rawData.testImages.shape[0], 784]);
+          rawData.testImages.dispose();
+        } else if (rawData.testImages.rank === 4) {
+          testImages = rawData.testImages.transpose([0, 2, 3, 1]);
+          rawData.testImages.dispose();
+        }
+        rawData.trainImages.dispose();
+        rawData.trainLabels.dispose();
+
+        testData = {
+          testImages,
+          testLabels: rawData.testLabels,
+        };
+        activeTestData = testData;
+      }
+
+      // Real evaluation using TensorFlow.js
+      const evalResult = model.evaluate(testData.testImages, testData.testLabels) as tf.Scalar[];
+      const loss = (await evalResult[0].data())[0];
+      const acc = (await evalResult[1].data())[0];
+      evalResult[0].dispose();
+      evalResult[1].dispose();
+
+      self.postMessage({
+        type: 'EVALUATION_COMPLETED',
+        loss,
+        accuracy: acc,
+      });
+    } catch (err: any) {
+      self.postMessage({
+        type: 'EVALUATION_ERROR',
+        error: err?.message || String(err),
+      });
+    }
+    return;
+  }
+
+  if (msg.type === 'RUN_PREDICTION') {
+    try {
+      let model = activeModel;
+      if (!model && msg.graph) {
+        const compiled = compileGraphToTfjs(msg.graph);
+        model = compiled.model;
+        activeModel = model;
+      }
+
+      if (!model) {
+        throw new Error('No active model available for prediction');
+      }
+
+      const expectedShape = model.inputs[0]?.shape;
+      const isFlattened = expectedShape && expectedShape.length === 2 && expectedShape[1] === 784;
+
+      const inputTensor = tf.tidy(() => {
+        const raw = tf.tensor(msg.inputData);
+        if (isFlattened) {
+          return raw.reshape([1, 784]);
+        }
+        return raw.reshape([1, 28, 28, 1]);
+      });
+
+      const logits = model.predict(inputTensor) as tf.Tensor;
+      const probsTensor = tf.tidy(() => tf.softmax(logits));
+      const probArray = Array.from(await probsTensor.data());
+
+      inputTensor.dispose();
+      logits.dispose();
+      probsTensor.dispose();
+
+      let topClass = 0;
+      let maxProb = probArray[0] ?? 0;
+      for (let i = 1; i < probArray.length; i++) {
+        if (probArray[i] > maxProb) {
+          maxProb = probArray[i];
+          topClass = i;
+        }
+      }
+
+      self.postMessage({
+        type: 'PREDICTION_COMPLETED',
+        probabilities: probArray,
+        topClass,
+      });
+    } catch (err: any) {
+      self.postMessage({
+        type: 'PREDICTION_ERROR',
+        error: err?.message || String(err),
+      });
+    }
+    return;
+  }
+
   if (msg.type === 'START_TRAINING') {
     let data: MnistData | null = null;
 
     try {
+      cleanupSession();
+
       // 1. Compile model from canonical Graph JSON
       const compiled = compileGraphToTfjs(msg.graph);
       activeModel = compiled.model;
@@ -63,19 +213,17 @@ self.onmessage = async (e: MessageEvent<TrainingInMessage>) => {
       // 2. Load dataset
       const rawData = generateSyntheticMnist(msg.config?.sampleCount || 800);
 
-      // Section 6 & Trap 1: Handle PyTorch [B, C, H, W] -> TF.js input format
+      // Handle PyTorch [B, C, H, W] -> TF.js input format
       let trainImages: tf.Tensor = rawData.trainImages;
       let testImages: tf.Tensor = rawData.testImages;
 
       const expectedShape = model.inputs[0]?.shape;
       if (expectedShape && expectedShape.length === 2 && expectedShape[1] === 784) {
-        // Flatten to [B, 784] if model expects 2D input
         trainImages = rawData.trainImages.reshape([rawData.trainImages.shape[0], 784]);
         testImages = rawData.testImages.reshape([rawData.testImages.shape[0], 784]);
         rawData.trainImages.dispose();
         rawData.testImages.dispose();
       } else if (rawData.trainImages.rank === 4) {
-        // Transpose [B, 1, 28, 28] -> [B, 28, 28, 1] for TF.js channelsLast
         trainImages = rawData.trainImages.transpose([0, 2, 3, 1]);
         testImages = rawData.testImages.transpose([0, 2, 3, 1]);
         rawData.trainImages.dispose();
@@ -91,7 +239,7 @@ self.onmessage = async (e: MessageEvent<TrainingInMessage>) => {
       const epochs = msg.config?.epochs ?? compiled.epochs;
       const batchSize = msg.config?.batchSize ?? compiled.batchSize;
 
-      // Send initial untrained baseline (Epoch 0: random initialization ~ln(10)=2.3, acc ~10%)
+      // Send initial untrained baseline (Epoch 0)
       try {
         const preEval = model.evaluate(data.testImages, data.testLabels) as tf.Scalar[];
         const preLoss = (await preEval[0].data())[0];
@@ -142,12 +290,18 @@ self.onmessage = async (e: MessageEvent<TrainingInMessage>) => {
         },
       });
 
-      // 4. Final evaluation
+      // 4. Final evaluation on real test set
       const evalResult = model.evaluate(data.testImages, data.testLabels) as tf.Scalar[];
       const testLoss = (await evalResult[0].data())[0];
       const testAcc = (await evalResult[1].data())[0];
       evalResult[0].dispose();
       evalResult[1].dispose();
+
+      // Store test data for future live evaluations
+      activeTestData = {
+        testImages: data.testImages,
+        testLabels: data.testLabels,
+      };
 
       self.postMessage({
         type: 'TRAINING_COMPLETED',
@@ -161,12 +315,10 @@ self.onmessage = async (e: MessageEvent<TrainingInMessage>) => {
         error: err?.message || String(err),
       });
     } finally {
-      // Clean up dataset tensors
+      // Clean up training tensors only (retaining test set for evaluation)
       if (data) {
         data.trainImages.dispose();
         data.trainLabels.dispose();
-        data.testImages.dispose();
-        data.testLabels.dispose();
       }
     }
   }
