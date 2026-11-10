@@ -32,6 +32,7 @@ export const loadDatasetNodeDef: NodeDefinition = {
         { label: 'MNIST (28×28 Grayscale digits 0-9)', value: 'mnist' },
         { label: 'Fashion-MNIST (28×28 Clothing items)', value: 'fashion_mnist' },
         { label: 'CIFAR-10 (32×32 Color objects)', value: 'cifar10' },
+        { label: 'Custom Dataset (Local CSV)', value: 'custom_csv' },
       ],
       help: 'Vision benchmark dataset loaded into memory for your experiment.',
     },

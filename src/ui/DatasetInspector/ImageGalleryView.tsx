@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getAuthenticSample } from '../../core/authenticDatasets';
+import { getAuthenticSample, TabularDataset } from '../../core/authenticDatasets';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface ImageGalleryViewProps {
   datasetId: string;
   classes: string[];
   totalSamples: number;
+  customDataset?: TabularDataset | null;
 }
 
 interface SelectedSampleDetail {
@@ -22,6 +23,7 @@ export const ImageGalleryView: React.FC<ImageGalleryViewProps> = ({
   datasetId,
   classes,
   totalSamples,
+  customDataset,
 }) => {
   const [selectedClass, setSelectedClass] = useState<number | 'all'>('all');
   const [page, setPage] = useState(0);
@@ -31,15 +33,26 @@ export const ImageGalleryView: React.FC<ImageGalleryViewProps> = ({
   // Filter sample indices matching selected class
   const classFilteredIndices = React.useMemo(() => {
     const indices: number[] = [];
-    const limit = Math.min(totalSamples, 2000);
+    const limit = customDataset ? customDataset.rows.length : Math.min(totalSamples, 5000);
+    const targetIdx = customDataset ? customDataset.headers.indexOf(customDataset.targetColumn) : -1;
+
     for (let i = 0; i < limit; i++) {
-      const label = i % classes.length;
+      let label = 0;
+      if (customDataset && customDataset.rows[i]) {
+        const row = customDataset.rows[i];
+        const lIdx = targetIdx >= 0 ? targetIdx : row.length - 1;
+        const num = Number(row[lIdx]);
+        label = isNaN(num) ? 0 : num;
+      } else {
+        label = i % classes.length;
+      }
+
       if (selectedClass === 'all' || selectedClass === label) {
         indices.push(i);
       }
     }
     return indices;
-  }, [selectedClass, classes.length, totalSamples]);
+  }, [selectedClass, classes.length, totalSamples, customDataset]);
 
   const maxPages = Math.max(1, Math.ceil(classFilteredIndices.length / pageSize));
   const currentIndices = classFilteredIndices.slice(page * pageSize, (page + 1) * pageSize);
@@ -128,6 +141,7 @@ export const ImageGalleryView: React.FC<ImageGalleryViewProps> = ({
             sampleIndex={sampleIdx}
             isSelected={inspectDetail?.index === sampleIdx}
             onInspect={(detail) => setInspectDetail(detail)}
+            customDataset={customDataset}
           />
         ))}
       </div>
@@ -227,6 +241,7 @@ interface SampleCardProps {
   sampleIndex: number;
   isSelected: boolean;
   onInspect: (detail: SelectedSampleDetail) => void;
+  customDataset?: TabularDataset | null;
 }
 
 const SampleCard: React.FC<SampleCardProps> = ({
@@ -234,12 +249,33 @@ const SampleCard: React.FC<SampleCardProps> = ({
   sampleIndex,
   isSelected,
   onInspect,
+  customDataset,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const sample = React.useMemo(
-    () => getAuthenticSample(datasetId, sampleIndex),
-    [datasetId, sampleIndex]
-  );
+  const sample = React.useMemo(() => {
+    if (customDataset && customDataset.rows[sampleIndex]) {
+      const row = customDataset.rows[sampleIndex];
+      const targetIdx = customDataset.headers.indexOf(customDataset.targetColumn);
+      const labelIdx = targetIdx >= 0 ? targetIdx : row.length - 1;
+      const rawLabel = Number(row[labelIdx]);
+      const label = isNaN(rawLabel) ? 0 : rawLabel;
+
+      const pixels = new Float32Array(784);
+      let pIdx = 0;
+      for (let c = 0; c < row.length && pIdx < 784; c++) {
+        if (c !== labelIdx) {
+          pixels[pIdx++] = Number(row[c]) || 0;
+        }
+      }
+
+      return {
+        pixels,
+        label,
+        className: String(label),
+      };
+    }
+    return getAuthenticSample(datasetId, sampleIndex);
+  }, [customDataset, datasetId, sampleIndex]);
 
   useEffect(() => {
     const canvas = canvasRef.current;

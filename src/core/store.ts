@@ -7,6 +7,7 @@ import {
   LayerEntry,
   parseSocketRef,
 } from './graph';
+import { TabularDataset } from './authenticDatasets';
 
 export type WorkspaceTab = 'canvas' | 'dataset';
 
@@ -15,6 +16,8 @@ export interface GraphState {
   selectedNodeId: string | null;
   activeWorkspaceTab: WorkspaceTab;
   setActiveWorkspaceTab: (tab: WorkspaceTab) => void;
+  customDataset: TabularDataset | null;
+  setCustomDataset: (dataset: TabularDataset | null) => void;
 
   // Actions
   addNode: (type: string, params?: NodeParams, position?: { x: number; y: number }, layers?: LayerEntry[]) => string;
@@ -118,9 +121,14 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   },
   selectedNodeId: null,
   activeWorkspaceTab: 'canvas',
+  customDataset: null,
 
   setActiveWorkspaceTab: (tab: WorkspaceTab) => {
     set({ activeWorkspaceTab: tab });
+  },
+
+  setCustomDataset: (dataset: TabularDataset | null) => {
+    set({ customDataset: dataset });
   },
 
   addNode: (type: string, params: NodeParams = {}, position = { x: 100, y: 100 }, layers?: LayerEntry[]) => {

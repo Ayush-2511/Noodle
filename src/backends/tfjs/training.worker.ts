@@ -13,6 +13,7 @@ import * as tf from '@tensorflow/tfjs';
 import { compileGraphToTfjs } from './modelCompiler';
 import { generateSyntheticMnist, MnistData } from './mnistLoader';
 import { Graph } from '../../core/graph';
+import { TabularDataset } from '../../core/authenticDatasets';
 
 export interface WorkerTrainingConfig {
   epochs?: number;
@@ -24,6 +25,7 @@ export interface StartTrainingMessage {
   type: 'START_TRAINING';
   graph: Graph;
   config?: WorkerTrainingConfig;
+  customData?: TabularDataset | null;
 }
 
 export interface StopTrainingMessage {
@@ -58,6 +60,93 @@ export type TrainingInMessage =
 
 let activeModel: tf.LayersModel | null = null;
 let activeTestData: { testImages: tf.Tensor; testLabels: tf.Tensor } | null = null;
+
+function convertCustomDatasetToTensors(
+  customData: TabularDataset,
+  expectedShape?: (number | null)[],
+  expectedOutputClasses = 10
+): MnistData | null {
+  const numRows = customData.rows.length;
+  if (numRows === 0) return null;
+
+  const targetColIdx = customData.headers.indexOf(customData.targetColumn);
+  const targetIdx = targetColIdx >= 0 ? targetColIdx : customData.headers.length - 1;
+
+  const rawFeatures: number[][] = [];
+  const rawLabels: number[] = [];
+  const classMap = new Map<string, number>();
+
+  for (let i = 0; i < numRows; i++) {
+    const row = customData.rows[i];
+    const featRow: number[] = [];
+    for (let c = 0; c < row.length; c++) {
+      if (c === targetIdx) continue;
+      const v = Number(row[c]);
+      featRow.push(isNaN(v) ? 0 : v);
+    }
+    rawFeatures.push(featRow);
+
+    const rawTarget = row[targetIdx];
+    let labelNum = Number(rawTarget);
+    if (isNaN(labelNum)) {
+      const str = String(rawTarget);
+      if (!classMap.has(str)) {
+        classMap.set(str, classMap.size);
+      }
+      labelNum = classMap.get(str)!;
+    }
+    rawLabels.push(labelNum);
+  }
+
+  // Ensure one-hot depth strictly matches the neural network output layer units
+  const numClasses = expectedOutputClasses || 10;
+  const numFeatures = rawFeatures[0]?.length || 0;
+
+  // Auto-normalize pixel brightness if 784 features and values exceed 1.0
+  if (numFeatures === 784) {
+    let hasLargeValues = false;
+    for (let i = 0; i < Math.min(10, numRows); i++) {
+      if (rawFeatures[i].some((v) => v > 1.0)) {
+        hasLargeValues = true;
+        break;
+      }
+    }
+    if (hasLargeValues) {
+      for (let i = 0; i < numRows; i++) {
+        for (let j = 0; j < 784; j++) {
+          rawFeatures[i][j] /= 255.0;
+        }
+      }
+    }
+  }
+
+  const trainSplit = Math.max(1, Math.floor(numRows * 0.8));
+  const testSplit = numRows - trainSplit;
+
+  return tf.tidy(() => {
+    const allX = tf.tensor2d(rawFeatures);
+    const allY = tf.oneHot(tf.tensor1d(rawLabels, 'int32'), numClasses);
+
+    let trainX = allX.slice([0, 0], [trainSplit, -1]);
+    const trainY = allY.slice([0, 0], [trainSplit, -1]);
+    let testX = allX.slice([trainSplit, 0], [testSplit > 0 ? testSplit : trainSplit, -1]);
+    const testY = allY.slice([trainSplit, 0], [testSplit > 0 ? testSplit : trainSplit, -1]);
+
+    // Reshape to NHWC if network expects 4D [B, 28, 28, 1]
+    if (expectedShape && expectedShape.length === 4 && numFeatures === 784) {
+      trainX = trainX.reshape([trainSplit, 28, 28, 1]);
+      testX = testX.reshape([testSplit > 0 ? testSplit : trainSplit, 28, 28, 1]);
+    }
+
+    return {
+      trainImages: trainX,
+      trainLabels: trainY,
+      testImages: testX,
+      testLabels: testY,
+      sampleCount: numRows,
+    };
+  });
+}
 
 function cleanupSession() {
   if (activeTestData) {
@@ -298,22 +387,31 @@ self.onmessage = async (e: MessageEvent<TrainingInMessage>) => {
       self.postMessage({
         type: 'TRAINING_STARTED',
         numTensors: initialTensors,
+        backend: tf.getBackend(),
       });
 
-      // 2. Load dataset
-      const rawData = generateSyntheticMnist(msg.config?.sampleCount || 800);
+      const expectedShape = model.inputs[0]?.shape;
+      const expectedOutputClasses = model.outputs[0]?.shape[1] || 10;
+
+      // 2. Load dataset (custom dataset if provided, else benchmark)
+      let rawData: MnistData | null = null;
+      if (msg.customData && msg.customData.rows && msg.customData.rows.length > 0) {
+        rawData = convertCustomDatasetToTensors(msg.customData, expectedShape, expectedOutputClasses);
+      }
+      if (!rawData) {
+        rawData = generateSyntheticMnist(msg.config?.sampleCount || 800);
+      }
 
       // Handle PyTorch [B, C, H, W] -> TF.js input format
       let trainImages: tf.Tensor = rawData.trainImages;
       let testImages: tf.Tensor = rawData.testImages;
 
-      const expectedShape = model.inputs[0]?.shape;
       if (expectedShape && expectedShape.length === 2 && expectedShape[1] === 784) {
         trainImages = rawData.trainImages.reshape([rawData.trainImages.shape[0], 784]);
         testImages = rawData.testImages.reshape([rawData.testImages.shape[0], 784]);
         rawData.trainImages.dispose();
         rawData.testImages.dispose();
-      } else if (rawData.trainImages.rank === 4) {
+      } else if (rawData.trainImages.rank === 4 && rawData.trainImages.shape[1] === 1) {
         trainImages = rawData.trainImages.transpose([0, 2, 3, 1]);
         testImages = rawData.testImages.transpose([0, 2, 3, 1]);
         rawData.trainImages.dispose();

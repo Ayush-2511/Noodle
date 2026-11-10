@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Graph } from '../../core/graph';
 import { WorkerTrainingConfig } from './training.worker';
+import { useGraphStore } from '../../core/store';
 
 export type TrainingStatus = 'idle' | 'training' | 'completed' | 'error';
 
@@ -39,6 +40,7 @@ export interface TrainingWorkerState {
   latestAccuracy: number | null;
   history: EpochLog[];
   numTensors: number;
+  backend: string;
   errorMessage: string | null;
   startTraining: (graph: Graph, config?: WorkerTrainingConfig) => void;
   stopTraining: () => void;
@@ -63,6 +65,7 @@ export function useTrainingWorker(): TrainingWorkerState {
   const [latestAccuracy, setLatestAccuracy] = useState<number | null>(null);
   const [history, setHistory] = useState<EpochLog[]>([]);
   const [numTensors, setNumTensors] = useState<number>(0);
+  const [backend, setBackend] = useState<string>('cpu');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [evalResult, setEvalResult] = useState<EvaluationResult | null>(null);
@@ -90,6 +93,7 @@ export function useTrainingWorker(): TrainingWorkerState {
             setErrorMessage(null);
             setHistory([]);
             setNumTensors(msg.numTensors || 0);
+            if (msg.backend) setBackend(msg.backend);
             break;
 
           case 'EPOCH_BEGIN':
@@ -226,10 +230,12 @@ export function useTrainingWorker(): TrainingWorkerState {
     setErrorMessage(null);
     setLatestLoss(null);
     setLatestAccuracy(null);
+    const customData = useGraphStore.getState().customDataset;
     workerRef.current.postMessage({
       type: 'START_TRAINING',
       graph,
       config,
+      customData,
     });
   }, []);
 
@@ -306,6 +312,7 @@ export function useTrainingWorker(): TrainingWorkerState {
     latestAccuracy,
     history,
     numTensors,
+    backend,
     errorMessage,
     startTraining,
     stopTraining,

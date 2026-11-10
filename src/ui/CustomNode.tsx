@@ -1,10 +1,11 @@
 import React, { useCallback, useState } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
-import { Trash2, Play, Square, Info, BarChart2, Loader2, Check } from 'lucide-react';
+import { Trash2, Play, Square, Info, BarChart2, Loader2, Check, FolderOpen, Eye } from 'lucide-react';
 import { getNodeDefinition } from '../nodes/registry';
 import { useGraphStore } from '../core/store';
 import { formatShape, TensorShape } from '../core/shapeEngine';
 import { useTrainingSafe } from '../backends/tfjs/TrainingContext';
+import { importCustomDatasetDialog } from '../core/datasetImporter';
 import { MetricsChart } from './MetricsChart';
 import { LayerStack } from './LayerStack';
 import { PredictCanvas } from './PredictCanvas';
@@ -63,7 +64,7 @@ export const CustomNode: React.FC<NodeProps> = React.memo(({ id, data, selected 
   const paramCount = nodeData.paramCount || 0;
 
   const isBuilder = nodeData.type === 'FeatureExtractor' || nodeData.type === 'Classifier';
-  const nodeWidth = isBuilder ? 330 : nodeData.type === 'Predict' ? 330 : (nodeData.type === 'LoadDataset' || nodeData.type === 'TrainTestSplit') ? 240 : 220;
+  const nodeWidth = isBuilder ? 330 : nodeData.type === 'Predict' ? 330 : nodeData.type === 'LoadDataset' ? 260 : nodeData.type === 'TrainTestSplit' ? 240 : 220;
 
   return (
     <div
@@ -250,43 +251,142 @@ export const CustomNode: React.FC<NodeProps> = React.memo(({ id, data, selected 
         {nodeData.type === 'LoadDataset' && (
           <div style={{ marginTop: 6, padding: '8px 10px', backgroundColor: '#181818', borderRadius: 3, border: '1px solid #2d2d2d' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <span style={{ fontSize: '0.72rem', color: '#f3f3f3', fontWeight: 600 }}>
-                {String(nodeData.params.dataset || 'mnist').toUpperCase()}
+              <span style={{ fontSize: '0.72rem', color: '#f3f3f3', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 140 }}>
+                {nodeData.params.dataset === 'custom_csv'
+                  ? (nodeData.params.fileName || 'CUSTOM CSV')
+                  : String(nodeData.params.dataset || 'mnist').toUpperCase()}
               </span>
-              <span style={{ fontSize: '0.62rem', color: '#888888', backgroundColor: '#252526', padding: '1px 5px', borderRadius: 2, border: '1px solid #333333' }}>
-                Vision Benchmark
+              <span
+                style={{
+                  fontSize: '0.62rem',
+                  color: nodeData.params.dataset === 'custom_csv' ? '#60a5fa' : '#888888',
+                  backgroundColor: nodeData.params.dataset === 'custom_csv' ? 'rgba(0, 120, 212, 0.2)' : '#252526',
+                  padding: '1px 5px',
+                  borderRadius: 2,
+                  border: nodeData.params.dataset === 'custom_csv' ? '1px solid #0078d4' : '1px solid #333333',
+                  fontWeight: nodeData.params.dataset === 'custom_csv' ? 600 : 400,
+                }}
+              >
+                {nodeData.params.dataset === 'custom_csv' ? 'Custom Dataset' : 'Vision Benchmark'}
               </span>
             </div>
+
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#888888', marginBottom: 8 }}>
-              <span>60,000 samples</span>
-              <span style={{ fontFamily: 'Consolas, monospace' }}>28×28×1</span>
+              <span>
+                {nodeData.params.dataset === 'custom_csv'
+                  ? `${(Number(nodeData.params.sampleCount) || 0).toLocaleString()} rows`
+                  : '60,000 samples'}
+              </span>
+              <span style={{ fontFamily: 'Consolas, monospace' }}>
+                {nodeData.params.dataset === 'custom_csv'
+                  ? `${nodeData.params.featureCount || 'N'} cols`
+                  : '28×28×1'}
+              </span>
             </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                useGraphStore.getState().setActiveWorkspaceTab('dataset');
-              }}
-              style={{
-                width: '100%',
-                padding: '4px 8px',
-                backgroundColor: '#252526',
-                color: '#0078d4',
-                border: '1px solid #333337',
-                borderRadius: 3,
-                fontSize: '0.7rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 5,
-                transition: 'background-color 0.12s ease',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#2d2d30')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#252526')}
-            >
-              <span>Inspect Dataset (Ctrl+2)</span>
-            </button>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  const res = await importCustomDatasetDialog();
+                  if (res) {
+                    useGraphStore.getState().setCustomDataset(res.parsed);
+                    updateNodeParams(id, {
+                      dataset: 'custom_csv',
+                      filePath: res.filePath,
+                      fileName: res.fileName,
+                      sampleCount: res.parsed.rowCount,
+                      featureCount: res.parsed.featureColumns.length,
+                      targetColumn: res.parsed.targetColumn,
+                      modality: 'tabular',
+                    });
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  padding: '5px 8px',
+                  backgroundColor: '#0078d4',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: 3,
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  transition: 'background-color 0.12s ease',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#106ebe')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#0078d4')}
+              >
+                <FolderOpen size={12} />
+                <span>
+                  {nodeData.params.dataset === 'custom_csv' ? 'Change Dataset File...' : 'Use Custom Dataset (CSV / MNIST)...'}
+                </span>
+              </button>
+
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    useGraphStore.getState().setActiveWorkspaceTab('dataset');
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '4px 6px',
+                    backgroundColor: '#252526',
+                    color: '#cccccc',
+                    border: '1px solid #333337',
+                    borderRadius: 3,
+                    fontSize: '0.68rem',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 4,
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#2d2d30')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#252526')}
+                >
+                  <Eye size={11} color="#888888" />
+                  <span>Inspect (Ctrl+2)</span>
+                </button>
+
+                {nodeData.params.dataset === 'custom_csv' && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      updateNodeParams(id, {
+                        dataset: 'mnist',
+                        filePath: undefined,
+                        fileName: undefined,
+                        sampleCount: undefined,
+                        featureCount: undefined,
+                        targetColumn: undefined,
+                        modality: 'image',
+                      });
+                    }}
+                    style={{
+                      padding: '4px 6px',
+                      backgroundColor: '#252526',
+                      color: '#888888',
+                      border: '1px solid #333337',
+                      borderRadius: 3,
+                      fontSize: '0.68rem',
+                      cursor: 'pointer',
+                    }}
+                    title="Reset to MNIST benchmark"
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#2d2d30')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#252526')}
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
@@ -696,6 +796,26 @@ export const CustomNode: React.FC<NodeProps> = React.memo(({ id, data, selected 
               <span>Status: <strong style={{ color: training.status === 'training' ? '#38bdf8' : training.status === 'completed' ? '#22c55e' : training.status === 'error' ? '#ef4444' : '#cbd5e1' }}>{training.status.toUpperCase()}</strong></span>
               {training.status === 'training' && <span>Ep {training.currentEpoch}/{training.totalEpochs}</span>}
             </div>
+
+            {/* Error Message Banner */}
+            {training.status === 'error' && training.errorMessage && (
+              <div
+                style={{
+                  marginTop: 6,
+                  padding: '6px 8px',
+                  backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                  border: '1px solid #ef4444',
+                  borderRadius: 4,
+                  color: '#fca5a5',
+                  fontSize: '0.68rem',
+                  lineHeight: 1.35,
+                  wordBreak: 'break-word',
+                }}
+              >
+                <div style={{ fontWeight: 600, color: '#f87171', marginBottom: 2 }}>Training Error:</div>
+                <div>{training.errorMessage}</div>
+              </div>
+            )}
           </div>
         )}
 

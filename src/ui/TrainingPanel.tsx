@@ -122,7 +122,7 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ training: propTrai
               : training.status === 'completed'
               ? 'Training Completed'
               : training.status === 'error'
-              ? 'Training Error'
+              ? `Training Error${training.errorMessage ? `: ${training.errorMessage}` : ''}`
               : 'Engine Ready'}
           </span>
         </div>
@@ -145,7 +145,7 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ training: propTrai
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, color: '#666666', fontSize: '0.68rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <Cpu size={12} color="#0078d4" />
-          <span>TensorFlow.js (WebGL)</span>
+          <span>TensorFlow.js ({(training.backend || 'cpu').toUpperCase()})</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <ShieldCheck size={12} color="#107c41" />
