@@ -11,6 +11,8 @@ export const maxpool2dNodeDef: NodeDefinition = {
   type: 'MaxPool2D',
   label: 'MaxPool2D',
   group: 'Layers',
+  summary: 'Shrinks feature maps, keeping strongest signals',
+  description: 'Halves or shrinks spatial dimensions by picking the maximum pixel in small windows (e.g. 2x2). Reduces computation and builds translation invariance.',
   defaultParams: {
     kernel: 2,
     stride: 2,
@@ -36,6 +38,7 @@ export const maxpool2dNodeDef: NodeDefinition = {
       type: 'number',
       min: 1,
       step: 1,
+      help: 'Pooling window size (2 = 2x2 window)',
     },
     {
       key: 'stride',
@@ -43,6 +46,7 @@ export const maxpool2dNodeDef: NodeDefinition = {
       type: 'number',
       min: 1,
       step: 1,
+      help: 'Window step (2 cuts height & width in half)',
     },
   ],
 };

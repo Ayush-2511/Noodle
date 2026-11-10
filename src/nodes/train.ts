@@ -13,6 +13,8 @@ export const trainNodeDef: NodeDefinition = {
   type: 'Train',
   label: 'Train',
   group: 'Training',
+  summary: 'Controls the training loop running in Web Worker',
+  description: 'Connects Loss and Optimizer into the execution engine. Lets you start and stop training in the background while monitoring live epoch metrics.',
   defaultParams: {
     epochs: 3,
     batch_size: 32,
@@ -44,7 +46,7 @@ export const trainNodeDef: NodeDefinition = {
       min: 1,
       max: 50,
       step: 1,
-      help: 'Number of full training cycles',
+      help: 'How many times the network sees the complete training dataset.',
     },
     {
       key: 'batch_size',
@@ -53,7 +55,7 @@ export const trainNodeDef: NodeDefinition = {
       min: 8,
       max: 256,
       step: 8,
-      help: 'Samples per gradient update',
+      help: 'Number of examples processed together before updating weights.',
     },
   ],
 };

@@ -15,6 +15,8 @@ export const addNodeDef: NodeDefinition = {
   type: 'Add',
   label: 'Add',
   group: 'Combine',
+  summary: 'Element-wise tensor addition (ResNet skip connections)',
+  description: 'Sums two incoming tensor branches point-by-point. Shapes must match exactly. The foundation of Residual networks (ResNets), allowing signals to bypass layers.',
   defaultParams: {},
   inputs: [
     {

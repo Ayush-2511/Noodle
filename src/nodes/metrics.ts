@@ -11,6 +11,8 @@ export const metricsNodeDef: NodeDefinition = {
   type: 'Metrics',
   label: 'Metrics',
   group: 'Training',
+  summary: 'Live real-time loss and accuracy curves',
+  description: 'Embeds an interactive telemetry chart directly on the canvas, plotting loss reduction (orange curve) and classification accuracy gains (green curve) as epochs progress.',
   defaultParams: {},
   inputs: [
     {

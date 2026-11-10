@@ -54,6 +54,7 @@ export const Editor: React.FC = () => {
           outputShapes: nodeStatus?.outputShapes || {},
           paramCount: nodeStatus?.paramCount || 0,
           problemMessage: nodeStatus?.problemMessage,
+          fixHint: nodeStatus?.fixHint,
         },
       };
     });

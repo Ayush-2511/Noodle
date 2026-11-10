@@ -14,6 +14,8 @@ export const lossNodeDef: NodeDefinition = {
   type: 'Loss',
   label: 'Loss',
   group: 'Training',
+  summary: 'Measures prediction error (lower is better)',
+  description: 'Compares network predictions against ground-truth labels. CrossEntropy is used for digit/image classification; MSE for continuous regression.',
   defaultParams: {
     fn: 'cross_entropy',
   },
@@ -42,10 +44,10 @@ export const lossNodeDef: NodeDefinition = {
       label: 'Loss Function',
       type: 'select',
       options: [
-        { label: 'CrossEntropy (Logits)', value: 'cross_entropy' },
-        { label: 'MSE (Mean Squared Error)', value: 'mse' },
+        { label: 'CrossEntropy (For classification)', value: 'cross_entropy' },
+        { label: 'MSE (For regression)', value: 'mse' },
       ],
-      help: 'Objective for gradient descent',
+      help: 'CrossEntropy expects unconstrained raw logits (not pre-softmaxed).',
     },
   ],
 };

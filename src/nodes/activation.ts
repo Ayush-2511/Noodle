@@ -11,6 +11,8 @@ export const activationNodeDef: NodeDefinition = {
   type: 'Activation',
   label: 'Activation',
   group: 'Activation',
+  summary: 'Introduces non-linearity so networks can learn complex patterns',
+  description: 'Without activations, stacking multiple linear layers is mathematically equivalent to just one linear layer. ReLU blocks negative values (max(0, x)) and is the gold-standard default.',
   defaultParams: {
     fn: 'relu',
   },
@@ -34,13 +36,13 @@ export const activationNodeDef: NodeDefinition = {
       label: 'Function',
       type: 'select',
       options: [
-        { label: 'ReLU', value: 'relu' },
-        { label: 'Sigmoid', value: 'sigmoid' },
-        { label: 'Tanh', value: 'tanh' },
-        { label: 'GELU', value: 'gelu' },
-        { label: 'Softmax', value: 'softmax' },
+        { label: 'ReLU (Standard default)', value: 'relu' },
+        { label: 'Sigmoid (Smooth 0 to 1)', value: 'sigmoid' },
+        { label: 'Tanh (-1 to +1)', value: 'tanh' },
+        { label: 'GELU (Smooth Gaussian)', value: 'gelu' },
+        { label: 'Softmax (Probabilities)', value: 'softmax' },
       ],
-      help: 'Element-wise activation',
+      help: 'Choose ReLU for hidden layers. Warning: avoid Softmax directly before CrossEntropy.',
     },
   ],
 };

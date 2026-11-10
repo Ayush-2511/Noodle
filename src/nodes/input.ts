@@ -10,6 +10,8 @@ export const inputNodeDef: NodeDefinition = {
   type: 'Input',
   label: 'Input',
   group: 'Data',
+  summary: 'Manual tensor shape placeholder for testing',
+  description: 'Defines an arbitrary input shape like [B, 784] or [B, 1, 28, 28] to test and design networks without loading real data.',
   defaultParams: {
     shape: '[B, 1, 28, 28]',
   },

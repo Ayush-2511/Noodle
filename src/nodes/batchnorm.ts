@@ -10,6 +10,8 @@ export const batchnormNodeDef: NodeDefinition = {
   type: 'BatchNorm',
   label: 'BatchNorm',
   group: 'Layers',
+  summary: 'Normalizes activations to stabilize and accelerate training',
+  description: 'Maintains zero mean and unit variance across batch activations. Prevents internal covariate shift and enables faster, more stable learning.',
   defaultParams: {},
   inputs: [
     {

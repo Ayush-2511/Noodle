@@ -1,6 +1,6 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
-import { Trash2, Play, Square } from 'lucide-react';
+import { Trash2, Play, Square, Info } from 'lucide-react';
 import { getNodeDefinition } from '../nodes/registry';
 import { useGraphStore } from '../core/store';
 import { formatShape, TensorShape } from '../core/shapeEngine';
@@ -14,6 +14,7 @@ export interface CustomNodeData {
   outputShapes?: Record<string, TensorShape>;
   paramCount?: number;
   problemMessage?: string;
+  fixHint?: string;
   [key: string]: unknown;
 }
 
@@ -24,6 +25,7 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
   const updateNodeParams = useGraphStore((state) => state.updateNodeParams);
   const removeNode = useGraphStore((state) => state.removeNode);
   const training = useTrainingSafe();
+  const [showInfo, setShowInfo] = useState(false);
 
   const handleParamChange = useCallback(
     (key: string, value: any) => {
@@ -113,24 +115,75 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
           </span>
         </div>
 
-        <button
-          onClick={handleDelete}
-          title="Delete Node"
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: '#64748b',
-            cursor: 'pointer',
-            padding: 2,
-            display: 'flex',
-            alignItems: 'center',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = '#64748b')}
-        >
-          <Trash2 size={13} />
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          {def.description && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowInfo((prev) => !prev);
+              }}
+              title="Learn about this layer (concept & parameters)"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: showInfo ? '#38bdf8' : '#64748b',
+                cursor: 'pointer',
+                padding: 2,
+                display: 'flex',
+                alignItems: 'center',
+                transition: 'color 0.15s ease',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#38bdf8')}
+              onMouseLeave={(e) => {
+                if (!showInfo) e.currentTarget.style.color = '#64748b';
+              }}
+            >
+              <Info size={13} />
+            </button>
+          )}
+
+          <button
+            onClick={handleDelete}
+            title="Delete Node"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#64748b',
+              cursor: 'pointer',
+              padding: 2,
+              display: 'flex',
+              alignItems: 'center',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = '#64748b')}
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
       </div>
+
+      {/* Explanatory Concept Card (Beginner UX / Proposal 2) */}
+      {showInfo && def.description && (
+        <div
+          style={{
+            padding: '8px 12px',
+            backgroundColor: '#090d16',
+            borderBottom: '1px solid #1e293b',
+            borderLeft: '3px solid #38bdf8',
+            fontSize: '0.69rem',
+            lineHeight: 1.4,
+            color: '#cbd5e1',
+          }}
+        >
+          <div style={{ fontWeight: 600, color: '#38bdf8', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span>💡</span>
+            <span>{def.summary || def.label}</span>
+          </div>
+          <div style={{ color: '#94a3b8' }}>
+            {def.description}
+          </div>
+        </div>
+      )}
 
       {/* Sockets and Body */}
       <div style={{ padding: '10px 12px' }}>
@@ -211,7 +264,15 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
                       gap: 8,
                     }}
                   >
-                    <label style={{ fontSize: '0.72rem', color: '#cbd5e1' }}>
+                    <label
+                      title={field.help}
+                      style={{
+                        fontSize: '0.72rem',
+                        color: '#cbd5e1',
+                        cursor: field.help ? 'help' : 'default',
+                        borderBottom: field.help ? '1px dotted #64748b' : 'none',
+                      }}
+                    >
                       {field.label}:
                     </label>
                     <input
@@ -249,7 +310,15 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
                       gap: 8,
                     }}
                   >
-                    <label style={{ fontSize: '0.72rem', color: '#cbd5e1' }}>
+                    <label
+                      title={field.help}
+                      style={{
+                        fontSize: '0.72rem',
+                        color: '#cbd5e1',
+                        cursor: field.help ? 'help' : 'default',
+                        borderBottom: field.help ? '1px dotted #64748b' : 'none',
+                      }}
+                    >
                       {field.label}:
                     </label>
                     <select
@@ -284,7 +353,15 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
                     gap: 3,
                   }}
                 >
-                  <label style={{ fontSize: '0.72rem', color: '#cbd5e1' }}>
+                  <label
+                    title={field.help}
+                    style={{
+                      fontSize: '0.72rem',
+                      color: '#cbd5e1',
+                      cursor: field.help ? 'help' : 'default',
+                      borderBottom: field.help ? '1px dotted #64748b' : 'none',
+                    }}
+                  >
                     {field.label}:
                   </label>
                   <input
@@ -421,16 +498,32 @@ export const CustomNode: React.FC<NodeProps> = ({ id, data, selected }) => {
           <div
             style={{
               marginTop: 6,
-              padding: '4px 6px',
+              padding: '6px 8px',
               borderRadius: 4,
               backgroundColor: status === 'error' ? '#450a0a' : '#422006',
               border: `1px solid ${status === 'error' ? '#b91c1c' : '#a16207'}`,
               color: status === 'error' ? '#fca5a5' : '#fef08a',
               fontSize: '0.68rem',
-              lineHeight: 1.3,
+              lineHeight: 1.35,
             }}
           >
-            {nodeData.problemMessage}
+            <div style={{ fontWeight: 600 }}>{nodeData.problemMessage}</div>
+            {nodeData.fixHint && (
+              <div
+                style={{
+                  marginTop: 4,
+                  paddingTop: 4,
+                  borderTop: `1px dashed ${status === 'error' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(234, 179, 8, 0.3)'}`,
+                  color: status === 'error' ? '#fed7aa' : '#fef9c3',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 4,
+                }}
+              >
+                <span style={{ fontWeight: 700, flexShrink: 0 }}>💡 Fix:</span>
+                <span>{nodeData.fixHint}</span>
+              </div>
+            )}
           </div>
         )}
       </div>

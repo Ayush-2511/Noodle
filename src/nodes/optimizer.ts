@@ -12,6 +12,8 @@ export const optimizerNodeDef: NodeDefinition = {
   type: 'Optimizer',
   label: 'Optimizer',
   group: 'Training',
+  summary: 'Weight update algorithm (Adam / SGD)',
+  description: 'The algorithm that updates model weights using gradients. Adam automatically adapts per-parameter learning rates and is the most forgiving for beginners.',
   defaultParams: {
     algo: 'adam',
     lr: 0.001,
@@ -30,10 +32,10 @@ export const optimizerNodeDef: NodeDefinition = {
       label: 'Algorithm',
       type: 'select',
       options: [
-        { label: 'Adam', value: 'adam' },
+        { label: 'Adam (Adaptive, recommended)', value: 'adam' },
         { label: 'SGD (Stochastic Gradient Descent)', value: 'sgd' },
       ],
-      help: 'Optimization algorithm',
+      help: 'Adam adapts learning rate per-weight; SGD uses fixed step size.',
     },
     {
       key: 'lr',
@@ -42,7 +44,7 @@ export const optimizerNodeDef: NodeDefinition = {
       min: 0.00001,
       max: 1.0,
       step: 0.0005,
-      help: 'Step size per gradient update',
+      help: 'How big a step to take. Too high = diverges; too low = slow. 0.001-0.005 is ideal.',
     },
   ],
 };

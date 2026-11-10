@@ -10,6 +10,8 @@ export const dropoutNodeDef: NodeDefinition = {
   type: 'Dropout',
   label: 'Dropout',
   group: 'Layers',
+  summary: 'Randomly disables neurons to prevent overfitting',
+  description: 'Randomly shuts off a fraction p of neuron activations during training steps. Forces network to learn robust, distributed representations rather than memorizing data.',
   defaultParams: {
     p: 0.5,
   },
@@ -35,6 +37,7 @@ export const dropoutNodeDef: NodeDefinition = {
       min: 0,
       max: 0.99,
       step: 0.05,
+      help: 'Probability of dropping an activation (e.g. 0.2 to 0.5)',
     },
   ],
 };

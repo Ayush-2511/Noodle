@@ -13,6 +13,8 @@ export const datasetNodeDef: NodeDefinition = {
   type: 'Dataset',
   label: 'Dataset',
   group: 'Data',
+  summary: 'Loads labeled image datasets (e.g. MNIST digits)',
+  description: 'Feeds batches of normalized images and ground-truth labels into the pipeline. MNIST provides 28x28 grayscale digits (0-9).',
   defaultParams: {
     name: 'mnist',
   },

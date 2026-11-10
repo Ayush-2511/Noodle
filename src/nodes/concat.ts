@@ -15,6 +15,8 @@ export const concatNodeDef: NodeDefinition = {
   type: 'Concat',
   label: 'Concat',
   group: 'Combine',
+  summary: 'Joins two tensor branches along an axis (e.g. channels)',
+  description: 'Glues two tensor branches together along a chosen dimension (axis 1 joins channels). All other dimensions (batch, height, width) must match.',
   defaultParams: {
     axis: 1,
   },

@@ -43,6 +43,8 @@ export interface NodeDefinition {
   type: string;
   label: string;
   group: NodeGroup;
+  description?: string; // Clear 1-2 sentence human description of what this does
+  summary?: string;     // Short one-line summary for palette and badges
   defaultParams: Record<string, any>;
   inputs: NodeSocket[];
   outputs: NodeSocket[];
