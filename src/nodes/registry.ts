@@ -8,6 +8,8 @@ import { flattenNodeDef } from './flatten';
 import { dropoutNodeDef } from './dropout';
 import { batchnormNodeDef } from './batchnorm';
 import { activationNodeDef } from './activation';
+import { addNodeDef } from './add';
+import { concatNodeDef } from './concat';
 import { lossNodeDef } from './loss';
 import { optimizerNodeDef } from './optimizer';
 import { trainNodeDef } from './train';
@@ -33,6 +35,10 @@ export const nodeRegistry: Record<string, NodeDefinition> = {
 
   // Activation
   Activation: activationNodeDef,
+
+  // Combine (Multi-branch / Merge)
+  Add: addNodeDef,
+  Concat: concatNodeDef,
 
   // Training
   Loss: lossNodeDef,

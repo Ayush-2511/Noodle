@@ -88,6 +88,64 @@ const MainApp: React.FC = () => {
     });
   };
 
+  const handleLoadResidualSample = () => {
+    loadGraph({
+      version: 1,
+      nodes: [
+        { id: 'n1', type: 'Dataset', params: { name: 'mnist' }, position: { x: 40, y: 140 } },
+        { id: 'n2', type: 'Conv2D', params: { out_channels: 8, kernel: 3, padding: 1, stride: 1 }, position: { x: 300, y: 140 } },
+        { id: 'n3', type: 'Activation', params: { fn: 'relu' }, position: { x: 560, y: 80 } },
+        { id: 'n4', type: 'Conv2D', params: { out_channels: 8, kernel: 3, padding: 1, stride: 1 }, position: { x: 820, y: 80 } },
+        { id: 'n5', type: 'Add', params: {}, position: { x: 1080, y: 140 } },
+        { id: 'n6', type: 'Activation', params: { fn: 'relu' }, position: { x: 1340, y: 140 } },
+        { id: 'n7', type: 'Flatten', params: {}, position: { x: 1600, y: 140 } },
+        { id: 'n8', type: 'Linear', params: { out_features: 10 }, position: { x: 1860, y: 140 } },
+        { id: 'n9', type: 'Loss', params: { fn: 'cross_entropy' }, position: { x: 2120, y: 140 } },
+      ],
+      edges: [
+        { from: 'n1.images', to: 'n2.in' },
+        { from: 'n2.out', to: 'n3.in' },
+        { from: 'n3.out', to: 'n4.in' },
+        { from: 'n4.out', to: 'n5.a' },
+        { from: 'n2.out', to: 'n5.b' },
+        { from: 'n5.out', to: 'n6.in' },
+        { from: 'n6.out', to: 'n7.in' },
+        { from: 'n7.out', to: 'n8.in' },
+        { from: 'n8.out', to: 'n9.logits' },
+        { from: 'n1.labels', to: 'n9.target' },
+      ],
+    });
+  };
+
+  const handleLoadConcatSample = () => {
+    loadGraph({
+      version: 1,
+      nodes: [
+        { id: 'n1', type: 'Dataset', params: { name: 'mnist' }, position: { x: 40, y: 140 } },
+        { id: 'n2', type: 'Conv2D', params: { out_channels: 8, kernel: 3, padding: 1, stride: 1 }, position: { x: 300, y: 60 } },
+        { id: 'n3', type: 'Activation', params: { fn: 'relu' }, position: { x: 560, y: 60 } },
+        { id: 'n4', type: 'Conv2D', params: { out_channels: 16, kernel: 3, padding: 1, stride: 1 }, position: { x: 300, y: 260 } },
+        { id: 'n5', type: 'Activation', params: { fn: 'relu' }, position: { x: 560, y: 260 } },
+        { id: 'n6', type: 'Concat', params: { axis: 1 }, position: { x: 820, y: 140 } },
+        { id: 'n7', type: 'Flatten', params: {}, position: { x: 1080, y: 140 } },
+        { id: 'n8', type: 'Linear', params: { out_features: 10 }, position: { x: 1340, y: 140 } },
+        { id: 'n9', type: 'Loss', params: { fn: 'cross_entropy' }, position: { x: 1600, y: 140 } },
+      ],
+      edges: [
+        { from: 'n1.images', to: 'n2.in' },
+        { from: 'n2.out', to: 'n3.in' },
+        { from: 'n1.images', to: 'n4.in' },
+        { from: 'n4.out', to: 'n5.in' },
+        { from: 'n3.out', to: 'n6.a' },
+        { from: 'n5.out', to: 'n6.b' },
+        { from: 'n6.out', to: 'n7.in' },
+        { from: 'n7.out', to: 'n8.in' },
+        { from: 'n8.out', to: 'n9.logits' },
+        { from: 'n1.labels', to: 'n9.target' },
+      ],
+    });
+  };
+
   const handleLoadFullPipeline = () => {
     loadGraph({
       version: 1,
@@ -230,6 +288,50 @@ const MainApp: React.FC = () => {
           </button>
 
           <button
+            onClick={handleLoadResidualSample}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              padding: '4px 10px',
+              backgroundColor: '#1e293b',
+              border: '1px solid #334155',
+              borderRadius: '6px',
+              color: '#cbd5e1',
+              fontSize: '0.75rem',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#f59e0b')}
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#334155')}
+          >
+            <Sparkles size={13} color="#f59e0b" />
+            <span>Load T3 (Residual)</span>
+          </button>
+
+          <button
+            onClick={handleLoadConcatSample}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              padding: '4px 10px',
+              backgroundColor: '#1e293b',
+              border: '1px solid #334155',
+              borderRadius: '6px',
+              color: '#cbd5e1',
+              fontSize: '0.75rem',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#06b6d4')}
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#334155')}
+          >
+            <Sparkles size={13} color="#06b6d4" />
+            <span>Load T4 (Concat)</span>
+          </button>
+
+          <button
             onClick={resetGraph}
             title="Clear canvas"
             style={{
@@ -262,7 +364,7 @@ const MainApp: React.FC = () => {
               border: '1px solid #7e22ce',
             }}
           >
-            M5: Live Telemetry
+            M7: Multi-Branch & Merge
           </span>
         </div>
       </header>

@@ -3,10 +3,10 @@ gsd_state_version: '1.0'
 status: ready_to_execute
 progress:
   total_phases: 11
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 17
-  completed_plans: 9
-  percent: 55
+  completed_plans: 11
+  percent: 64
 ---
 
 # Project State: Noodle (Node-Based Deep Learning Builder)
@@ -15,15 +15,15 @@ progress:
 
 See: `.planning/PROJECT.md` (created 2026-11-09)  
 **Core value:** Drag nodes, connect wires, see tensor shapes update live, train on MNIST in the browser, export clean PyTorch code.  
-**Current focus:** Phase 6 (M6: CNN Training Optimization)
+**Current focus:** Phase 8 (M8: Interactive Predict Node)
 
 ## Current Position
 
-Phase: 6 of 10 (M6: CNN Training Optimization)  
+Phase: 8 of 10 (M8: Interactive Predict Node)  
 Status: Ready to execute  
-Last activity: 2026-11-10 — Milestone 5 (Training Graph Nodes & Live Telemetry) completed. Loss, Optimizer, Train, and Metrics nodes wired into graph with live SVG loss/accuracy curves. 27 unit tests passing green.
+Last activity: 2026-11-10 — Milestone 7 (Multi-Branch & Merge Nodes) completed. Add and Concat nodes implemented, Functional API model compiler added, T3 (Residual) and T4 (Concat) test graphs passing shape inference and training smoke tests. 38 unit tests passing green.
 
-Progress: [██████░░░░] 55%
+Progress: [███████░░░] 64%
 
 ## Accumulated Context
 

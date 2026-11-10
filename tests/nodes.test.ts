@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { getNodeDefinition, getAllNodeDefinitions } from '../src/nodes/registry';
 
-describe('Node Registry & Definitions (M1 - M5)', () => {
+describe('Node Registry & Definitions (M1 - M7)', () => {
   it('should register core MVP nodes in registry', () => {
     const all = getAllNodeDefinitions();
-    expect(all.length).toBe(13);
+    expect(all.length).toBe(15);
     const types = all.map((d) => d.type);
 
     expect(types).toContain('Input');
@@ -16,6 +16,8 @@ describe('Node Registry & Definitions (M1 - M5)', () => {
     expect(types).toContain('Dropout');
     expect(types).toContain('BatchNorm');
     expect(types).toContain('Activation');
+    expect(types).toContain('Add');
+    expect(types).toContain('Concat');
     expect(types).toContain('Loss');
     expect(types).toContain('Optimizer');
     expect(types).toContain('Train');
@@ -83,5 +85,20 @@ describe('Node Registry & Definitions (M1 - M5)', () => {
     expect(lossDef.group).toBe('Training');
     expect(lossDef.inputs.map((s) => s.id)).toEqual(['logits', 'target']);
     expect(lossDef.outputs[0].type).toBe('scalar');
+  });
+
+  it('Add and Concat node definitions should match Section 4 spec', () => {
+    const addDef = getNodeDefinition('Add');
+    expect(addDef.type).toBe('Add');
+    expect(addDef.group).toBe('Combine');
+    expect(addDef.inputs.map((s) => s.id)).toEqual(['a', 'b']);
+    expect(addDef.outputs.map((s) => s.id)).toEqual(['out']);
+
+    const concatDef = getNodeDefinition('Concat');
+    expect(concatDef.type).toBe('Concat');
+    expect(concatDef.group).toBe('Combine');
+    expect(concatDef.defaultParams.axis).toBe(1);
+    expect(concatDef.inputs.map((s) => s.id)).toEqual(['a', 'b']);
+    expect(concatDef.outputs.map((s) => s.id)).toEqual(['out']);
   });
 });
